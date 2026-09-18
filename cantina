@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Cantina</title>
+
+<style>
+*{box-sizing:border-box;font-family:Arial,sans-serif;margin:0;padding:0}
+
+body{
+    background:#f5f5f5;
+    padding:15px;
+    max-width:480px;
+    margin:auto
+}
+
+h1{text-align:center;color:#333;margin-bottom:15px;font-size:22px}
+h2{font-size:18px;color:#444;margin:15px 0 10px}
+h3{font-size:15px;color:#555;margin:12px 0 6px}
+
+.card{
+    background:white;
+    border-radius:10px;
+    padding:15px;
+    margin-bottom:15px;
+    box-shadow:0 2px 5px rgba(0,0,0,.1)
+}
+
+input,button,select{
+    width:100%;
+    padding:12px;
+    margin:6px 0;
+    border-radius:6px;
+    border:1px solid #ddd;
+    font-size:15px
+}
+
+button{
+    background:#2563eb;
+    color:white;
+    border:none;
+    cursor:pointer;
+    font-weight:bold
+}
+
+button:hover{background:#1d4ed8}
+
+button.danger{background:#dc2626}
+button.danger:hover{background:#b91c1c}
+
+button.small{
+    width:auto;
+    padding:6px 10px;
+    font-size:13px
+}
+
+button.verde{background:#059669}
+button.gris{background:#6b7280}
+
+.tabs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:5px;
+    margin-bottom:15px
+}
+
+.tab{
+    flex:1;
+    padding:11px 4px;
+    background:#ddd;
+    font-size:13px
+}
+
+.tab.active{
+    background:#2563eb;
+    color:white
+}
+
+.oculto{display:none!important}
+
+.item{
+    padding:12px 0;
+    border-bottom:1px solid #eee;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px
+}
+
+.item:last-child{border-bottom:none}
+
+.resumen{background:#fef3c7}
+
+.divider{
+    border-top:1px dashed #d6b84c;
+    margin:15px 0
+}
+
+.efectivo{
+    font-size:22px;
+    font-weight:bold;
+    color:#059669;
+    background:#d1fae5;
+    padding:12px;
+    border-radius:8px;
+    text-align:center;
+    margin:10px 0
+}
+
+.ganancia{
+    color:#16a34a;
+    font-weight:bold
+}
+
+.perdida{
+    color:#dc2626;
+    font-weight:bold
+}
+
+.aviso{
+    font-size:13px;
+    color:#666;
+    margin-top:7px
+}
+
+.fecha{
+    text-align:center;
+    background:#e0e7ff;
+    padding:9px;
+    border-radius:7px;
+    margin-bottom:15px
+}
+
+.stock-bajo{
+    color:#dc2626;
+    font-weight:bold
+}
+
+.stock-ok{
+    color:#16a34a;
+    font-weight:bold
+}
+
+.historial{
+    background:#f9fafb;
+    border:1px solid #ddd;
+    border-radius:8px;
+    padding:12px;
+    margin-bottom:10px
+}
+</style>
+</head>
+
+<body>
+
+<h1>🍺 Control de Cantina</h1>
+
+<div class="fecha">
+📅 Día actual: <strong id="fecha"></strong>
+</div>
+
+<div class="tabs">
+<button class="tab active" onclick="mostrar('productos',this)">Productos</button>
+<button class="tab" onclick="mostrar('compras',this)">Compras</button>
+<button class="tab" onclick="mostrar('ventas',this)">Ventas</button>
+<button class="tab" onclick="mostrar('gastos',this)">Gastos</button>
+<button class="tab" onclick="mostrar('resumen',this)">Resumen</button>
+<button class="tab" onclick="mostrar('historial',this)">Historial</button>
+</div>
+
+
+<!-- PRODUCTOS -->
+
+<div id="productos">
+
+<div class="card">
+
+<h2>➕ Agregar Producto</h2>
+
+<input id="nombre" type="text" placeholder="Nombre del producto">
+
+<input id="costo" type="number" min="0" step="0.01"
+placeholder="Costo de compra">
+
+<input id="precio" type="number" min="0" step="0.01"
+placeholder="Precio de venta">
+
+<input id="stock" type="number" min="0" step="1"
+placeholder="Inventario inicial">
+
+<button onclick="agregarProducto()">
+Agregar Producto
+</button>
+
+</div>
+
+
+<div class="card">
+
+<h2>📦 Inventario ACTUAL</h2>
+
+<div id="inventario"></div>
+
+<p class="aviso">
+🔒 El inventario es permanente. Cerrar o comenzar un nuevo día
+NO modifica las existencias.
+</p>
+
+</div>
+
+</div>
+
+
+<!-- COMPRAS -->
+
+<div id="compras" class="oculto">
+
+<div class="card">
+
+<h2>🛒 Registrar Compra</h2>
+
+<select id="productoCompra"></select>
+
+<input id="cantidadCompra"
+type="number"
+min="1"
+step="1"
+placeholder="Cantidad comprada">
+
+<button onclick="registrarCompra()">
+Registrar Compra
+</button>
+
+</div>
+
+<div class="card">
+
+<h2>📋 Compras del día</h2>
+
+<div id="listaCompras"></div>
+
+</div>
+
+</div>
+
+
+<!-- VENTAS -->
+
+<div id="ventas" class="oculto">
+
+<div class="card">
+
+<h2>🍺 Registrar Venta</h2>
+
+<select id="productoVenta"></select>
+
+<input id="cantidadVenta"
+type="number"
+min="1"
+step="1"
+placeholder="Cantidad vendida">
+
+<button onclick="registrarVenta()">
+Registrar Venta
+</button>
+
+</div>
+
+<div class="card">
+
+<h2>📋 Ventas del día</h2>
+
+<div id="listaVentas"></div>
+
+</div>
+
+</div>
+
+
+<!-- GASTOS -->
+
+<div id="gastos" class="oculto">
+
+<div class="card">
+
+<h2>💸 Registrar Gasto</h2>
+
+<input id="descripcionGasto"
+type="text"
+placeholder="Descripción del gasto">
+
+<input id="montoGasto"
+type="number"
+min="0"
+step="0.01"
+placeholder="Monto">
+
+<button onclick="registrarGasto()">
+Registrar Gasto
+</button>
+
+</div>
+
+<div class="card">
+
+<h2>📋 Gastos del día</h2>
+
+<div id="listaGastos"></div>
+
+</div>
+
+</div>
+
+
+<!-- RESUMEN -->
+
+<div id="resumen" class="oculto">
+
+<div class="card resumen">
+
+<h2>📊 Resumen del Día</h2>
+
+<div id="resumenProductos"></div>
+
+<div class="divider"></div>
+
+<p>
+<strong>💰 Ventas:</strong>
+<span id="totalVentas">$0.00</span>
+</p>
+
+<p>
+<strong>🛒 Compras:</strong>
+<span id="totalCompras">$0.00</span>
+</p>
+
+<p>
+<strong>💸 Gastos:</strong>
+<span id="totalGastos">$0.00</span>
+</p>
+
+<div class="divider"></div>
+
+<p>
+<strong>📦 Costo de mercancía vendida:</strong>
+<span id="costoVendido">$0.00</span>
+</p>
+
+<p>
+<strong>✅ Ganancia neta:</strong>
+<span id="ganancia">$0.00</span>
+</p>
+
+<div class="divider"></div>
+
+<h3>💵 Caja</h3>
+
+<button class="verde" onclick="ponerCajaInicial()">
+Registrar dinero inicial de caja
+</button>
+
+<p>
+Dinero inicial:
+<strong id="cajaInicial">$0.00</strong>
+</p>
+
+<p class="efectivo" id="dineroCaja">
+$0.00
+</p>
+
+<div class="divider"></div>
+
+<button class="danger" onclick="nuevoDia()">
+🌙 CERRAR DÍA / NUEVO DÍA
+</button>
+
+<p class="aviso">
+⚠️ Este botón guarda el resumen del día y limpia únicamente
+las ventas, compras y gastos del día.
+<br><br>
+<strong>📦 EL INVENTARIO NO SE BORRA NI SE MODIFICA.</strong>
+</p>
+
+</div>
+
+</div>
+
+
+<!-- HISTORIAL -->
+
+<div id="historial" class="oculto">
+
+<div class="card">
+
+<h2>📚 Historial de Días</h2>
+
+<div id="listaHistorial"></div>
+
+</div>
+
+</div>
+
+
+<script>
+
+/* =========================================================
+   BASE DE DATOS LOCAL
+   ========================================================= */
+
+/*
+   IMPORTANTE:
+   NO HAY NINGÚN localStorage.removeItem().
+   Por eso recargar la página NO borra información.
+*/
+
+let productos =
+JSON.parse(localStorage.getItem("cantina_productos_v3")) || [];
+
+let ventas =
+JSON.parse(localStorage.getItem("cantina_ventas_v3")) || [];
+
+let compras =
+JSON.parse(localStorage.getItem("cantina_compras_v3")) || [];
+
+let gastos =
+JSON.parse(localStorage.getItem("cantina_gastos_v3")) || [];
+
+let historial =
+JSON.parse(localStorage.getItem("cantina_historial_v3")) || [];
+
+let cajaInicial =
+Number(localStorage.getItem("cantina_caja_v3")) || 0;
+
+
+/* =========================================================
+   GUARDAR
+   ========================================================= */
+
+function guardar(){
+
+    localStorage.setItem(
+        "cantina_productos_v3",
+        JSON.stringify(productos)
+    );
+
+    localStorage.setItem(
+        "cantina_ventas_v3",
+        JSON.stringify(ventas)
+    );
+
+    localStorage.setItem(
+        "cantina_compras_v3",
+        JSON.stringify(compras)
+    );
+
+    localStorage.setItem(
+        "cantina_gastos_v3",
+        JSON.stringify(gastos)
+    );
+
+    localStorage.setItem(
+        "cantina_historial_v3",
+        JSON.stringify(historial)
+    );
+
+    localStorage.setItem(
+        "cantina_caja_v3",
+        cajaInicial
+    );
+}
+
+
+/* =========================================================
+   FECHA
+   ========================================================= */
+
+function fechaActual(){
+
+    return new Date().toLocaleDateString(
+        "es-MX",
+        {
+            day:"2-digit",
+            month:"2-digit",
+            year:"numeric"
+        }
+    );
+}
+
+document.getElementById("fecha").textContent =
+fechaActual();
+
+
+/* =========================================================
+   PESTAÑAS
+   ========================================================= */
+
+function mostrar(nombre,boton){
+
+    [
+        "productos",
+        "compras",
+        "ventas",
+        "gastos",
+        "resumen",
+        "historial"
+    ].forEach(id=>{
+        document.getElementById(id)
+        .classList.add("oculto");
+    });
+
+    document.querySelectorAll(".tab")
+    .forEach(t=>t.classList.remove("active"));
+
+    document.getElementById(nombre)
+    .classList.remove("oculto");
+
+    boton.classList.add("active");
+
+    actualizar();
+}
+
+
+/* =========================================================
+   AGREGAR PRODUCTO
+   ========================================================= */
+
+function agregarProducto(){
+
+    const nombre =
+    document.getElementById("nombre").value.trim();
+
+    const costo =
+    Number(document.getElementById("costo").value);
+
+    const precio =
+    Number(document.getElementById("precio").value);
+
+    const stock =
+    Number(document.getElementById("stock").value) || 0;
+
+
+    if(
+        !nombre ||
+        isNaN(costo) ||
+        isNaN(precio) ||
+        costo<0 ||
+        precio<0 ||
+        stock<0
+    ){
+
+        alert("Completa correctamente todos los datos.");
+        return;
+    }
+
+
+    productos.push({
+
+        id:Date.now(),
+
+        nombre:nombre,
+
+        costo:costo,
+
+        precio:precio,
+
+        stock:stock
+
+    });
+
+
+    guardar();
+    actualizar();
+
+
+    document.getElementById("nombre").value="";
+    document.getElementById("costo").value="";
+    document.getElementById("precio").value="";
+    document.getElementById("stock").value="";
+
+
+    alert("✅ Producto agregado.");
+}
+
+
+/* =========================================================
+   COMPRA
+   ========================================================= */
+
+function registrarCompra(){
+
+    const id =
+    Number(document.getElementById("productoCompra").value);
+
+    const cantidad =
+    Number(document.getElementById("cantidadCompra").value);
+
+
+    if(
+        !id ||
+        !cantidad ||
+        cantidad<=0
+    ){
+
+        alert("Selecciona un producto y una cantidad.");
+        return;
+    }
+
+
+    const producto =
+    productos.find(p=>p.id===id);
+
+
+    if(!producto){
+
+        alert("Producto no encontrado.");
+        return;
+    }
+
+
+    /*
+       AQUÍ ES UNO DE LOS ÚNICOS LUGARES
+       DONDE SE MODIFICA EL INVENTARIO.
+    */
+
+    producto.stock += cantidad;
+
+
+    compras.unshift({
+
+        id:Date.now(),
+
+        productoId:producto.id,
+
+        nombre:producto.nombre,
+
+        cantidad:cantidad,
+
+        costo:producto.costo,
+
+        total:cantidad*producto.costo,
+
+        fecha:fechaActual()
+
+    });
+
+
+    guardar();
+    actualizar();
+
+
+    document.getElementById("cantidadCompra").value="";
+
+
+    alert(
+        "✅ Compra registrada.\n\n"+
+        producto.nombre+
+        "\nInventario actual: "+
+        producto.stock
+    );
+}
+
+
+/* =========================================================
+   VENTA
+   ========================================================= */
+
+function registrarVenta(){
+
+    const id =
+    Number(document.getElementById("productoVenta").value);
+
+    const cantidad =
+    Number(document.getElementById("cantidadVenta").value);
+
+
+    if(
+        !id ||
+        !cantidad ||
+        cantidad<=0
+    ){
+
+        alert("Selecciona un producto y una cantidad.");
+        return;
+    }
+
+
+    const producto =
+    productos.find(p=>p.id===id);
+
+
+    if(!producto){
+
+        alert("Producto no encontrado.");
+        return;
+    }
+
+
+    if(producto.stock < cantidad){
+
+        alert(
+            "❌ NO HAY SUFICIENTE INVENTARIO.\n\n"+
+            producto.nombre+
+            "\nDisponible: "+
+            producto.stock+
+            "\nSolicitado: "+
+            cantidad
+        );
+
+        return;
+    }
+
+
+    /*
+       AQUÍ SE DESCUENTA EL INVENTARIO.
+
+       ESTE STOCK QUEDA GUARDADO.
+
+       EL BOTÓN NUEVO DÍA JAMÁS TOCA ESTE VALOR.
+    */
+
+    producto.stock =
+    producto.stock - cantidad;
+
+
+    ventas.unshift({
+
+        id:Date.now(),
+
+        productoId:producto.id,
+
+        nombre:producto.nombre,
+
+        cantidad:cantidad,
+
+        precio:producto.precio,
+
+        costo:producto.costo,
+
+        total:cantidad*producto.precio,
+
+        costoTotal:cantidad*producto.costo,
+
+        fecha:fechaActual(),
+
+        hora:new Date().toLocaleTimeString("es-MX")
+
+    });
+
+
+    guardar();
+    actualizar();
+
+
+    document.getElementById("cantidadVenta").value="";
+
+
+    alert(
+        "✅ Venta registrada.\n\n"+
+        producto.nombre+
+        "\nVendidas: "+
+        cantidad+
+        "\nInventario restante: "+
+        producto.stock
+    );
+}
+
+
+/* =========================================================
+   ELIMINAR VENTA
+   ========================================================= */
+
+function eliminarVenta(id){
+
+    const venta =
+    ventas.find(v=>v.id===id);
+
+
+    if(!venta)return;
+
+
+    if(!confirm(
+        "¿Eliminar esta venta?\n\n"+
+        "La cantidad vendida volverá al inventario."
+    ))return;
+
+
+    const producto =
+    productos.find(
+        p=>p.id===venta.productoId
+    );
+
+
+    /*
+       SOLO AL DESHACER UNA VENTA
+       SE DEVUELVE EL PRODUCTO.
+    */
+
+    if(producto){
+
+        producto.stock += venta.cantidad;
+
+    }
+
+
+    ventas =
+    ventas.filter(v=>v.id!==id);
+
+
+    guardar();
+    actualizar();
+}
+
+
+/* =========================================================
+   GASTO
+   ========================================================= */
+
+function registrarGasto(){
+
+    const descripcion =
+    document.getElementById(
+        "descripcionGasto"
+    ).value.trim();
+
+    const monto =
+    Number(
+        document.getElementById(
+            "montoGasto"
+        ).value
+    );
+
+
+    if(
+        !descripcion ||
+        !monto ||
+        monto<=0
+    ){
+
+        alert("Completa correctamente los datos.");
+        return;
+    }
+
+
+    gastos.unshift({
+
+        id:Date.now(),
+
+        descripcion:descripcion,
+
+        monto:monto,
+
+        fecha:fechaActual()
+
+    });
+
+
+    guardar();
+    actualizar();
+
+
+    document.getElementById(
+        "descripcionGasto"
+    ).value="";
+
+    document.getElementById(
+        "montoGasto"
+    ).value="";
+}
+
+
+/* =========================================================
+   ELIMINAR GASTO
+   ========================================================= */
+
+function eliminarGasto(id){
+
+    if(!confirm("¿Eliminar este gasto?"))
+    return;
+
+
+    gastos =
+    gastos.filter(g=>g.id!==id);
+
+
+    guardar();
+    actualizar();
+}
+
+
+/* =========================================================
+   CAJA
+   ========================================================= */
+
+function ponerCajaInicial(){
+
+    const valor =
+    prompt(
+        "¿Cuánto dinero tienes en caja al comenzar el día?",
+        cajaInicial
+    );
+
+
+    if(valor===null)return;
+
+
+    const numero =
+    Number(valor);
+
+
+    if(
+        isNaN(numero) ||
+        numero<0
+    ){
+
+        alert("Cantidad inválida.");
+        return;
+    }
+
+
+    cajaInicial=numero;
+
+    guardar();
+    actualizar();
+}
+
+
+/* =========================================================
+   NUEVO DÍA
+   ========================================================= */
+
+function nuevoDia(){
+
+    const totalVentas =
+    ventas.reduce(
+        (s,v)=>s+v.total,
+        0
+    );
+
+
+    const totalCompras =
+    compras.reduce(
+        (s,c)=>s+c.total,
+        0
+    );
+
+
+    const totalGastos =
+    gastos.reduce(
+        (s,g)=>s+g.monto,
+        0
+    );
+
+
+    const costo =
+    ventas.reduce(
+        (s,v)=>s+v.costoTotal,
+        0
+    );
+
+
+    const ganancia =
+    totalVentas -
+    costo -
+    totalGastos;
+
+
+    const cajaFinal =
+    cajaInicial +
+    totalVentas -
+    totalCompras -
+    totalGastos;
+
+
+    if(!confirm(
+
+        "🔒 CERRAR DÍA\n\n"+
+
+        "Ventas: $"+
+        totalVentas.toFixed(2)+
+        "\nCompras: $"+
+        totalCompras.toFixed(2)+
+        "\nGastos: $"+
+        totalGastos.toFixed(2)+
+        "\nGanancia: $"+
+        ganancia.toFixed(2)+
+        "\nCaja esperada: $"+
+        cajaFinal.toFixed(2)+
+
+        "\n\n📦 EL INVENTARIO NO SE MODIFICARÁ."+
+
+        "\n\n¿Quieres cerrar el día?"
+
+    ))return;
+
+
+    /*
+       GUARDAMOS SOLAMENTE EL RESUMEN.
+
+       OBSERVA QUE AQUÍ NO HACEMOS:
+
+       productos = []
+       NI
+       productos.stock = stockInicial
+
+       NI
+       productos.stock += ventas
+
+       NI
+       productos.stock = ...
+
+       EL INVENTARIO QUEDA EXACTAMENTE
+       COMO ESTÁ EN ESTE MOMENTO.
+    */
+
+    historial.unshift({
+
+        id:Date.now(),
+
+        fecha:fechaActual(),
+
+        ventas:totalVentas,
+
+        compras:totalCompras,
+
+        gastos:totalGastos,
+
+        costo:costo,
+
+        ganancia:ganancia,
+
+        cajaInicial:cajaInicial,
+
+        cajaFinal:cajaFinal
+
+    });
+
+
+    /*
+       SOLAMENTE SE LIMPIAN LOS MOVIMIENTOS
+       DEL DÍA.
+    */
+
+    ventas=[];
+    compras=[];
+    gastos=[];
+
+    cajaInicial=0;
+
+
+    /*
+       MUY IMPORTANTE:
+
+       productos NO SE MODIFICA.
+    */
+
+
+    guardar();
+    actualizar();
+
+
+    alert(
+        "✅ DÍA CERRADO.\n\n"+
+        "📦 Inventario conservado.\n"+
+        "📚 Resumen guardado en historial.\n\n"+
+        "El nuevo día comienza con exactamente "+
+        "el inventario que quedó."
+    );
+}
+
+
+/* =========================================================
+   ACTUALIZAR INTERFAZ
+   ========================================================= */
+
+function actualizar(){
+
+    /* INVENTARIO */
+
+    let html="";
+
+
+    if(productos.length===0){
+
+        html=
+        "<p style='color:#888;text-align:center'>"+
+        "Sin productos todavía"+
+        "</p>";
+
+    }else{
+
+        productos.forEach(p=>{
+
+            const estado =
+            p.stock<=5
+            ? "<span class='stock-bajo'>⚠️ Stock bajo</span>"
+            : "<span class='stock-ok'>✓ Disponible</span>";
+
+
+            html+=`
+
+            <div class="item">
+
+                <div>
+
+                    <strong>${escapeHTML(p.nombre)}</strong>
+
+                    <br>
+
+                    📦 Stock actual:
+                    <strong>${p.stock}</strong>
+
+                    <br>
+
+                    ${estado}
+
+                    <br>
+
+                    Costo:
+                    $${p.costo.toFixed(2)}
+
+                    <br>
+
+                    Precio venta:
+                    $${p.precio.toFixed(2)}
+
+                    <br>
+
+                    Ganancia/unidad:
+                    <span class="ganancia">
+                    $${(p.precio-p.costo).toFixed(2)}
+                    </span>
+
+                </div>
+
+            </div>
+
+            `;
+
+        });
+
+    }
+
+
+    document.getElementById(
+        "inventario"
+    ).innerHTML=html;
+
+
+    /* SELECT COMPRAS */
+
+    let opcionesCompra =
+    "<option value=''>Seleccionar producto</option>";
+
+
+    productos.forEach(p=>{
+
+        opcionesCompra+=`
+        <option value="${p.id}">
+        ${escapeHTML(p.nombre)}
+        — Stock ${p.stock}
+        </option>`;
+
+    });
+
+
+    document.getElementById(
+        "productoCompra"
+    ).innerHTML=opcionesCompra;
+
+
+    /* SELECT VENTAS */
+
+    let opcionesVenta =
+    "<option value=''>Seleccionar producto</option>";
+
+
+    productos.forEach(p=>{
+
+        opcionesVenta+=`
+        <option value="${p.id}">
+        ${escapeHTML(p.nombre)}
+        — Stock ${p.stock}
+        </option>`;
+
+    });
+
+
+    document.getElementById(
+        "productoVenta"
+    ).innerHTML=opcionesVenta;
+
+
+    /* VENTAS */
+
+    let listaVentas="";
+
+
+    if(ventas.length===0){
+
+        listaVentas=
+        "<p style='color:#888;text-align:center'>"+
+        "Sin ventas hoy"+
+        "</p>";
+
+    }else{
+
+        ventas.forEach(v=>{
+
+            listaVentas+=`
+
+            <div class="item">
+
+                <div>
+
+                    <strong>
+                    ${escapeHTML(v.nombre)}
+                    </strong>
+
+                    × ${v.cantidad}
+
+                    <br>
+
+                    💰 $${v.total.toFixed(2)}
+
+                    <br>
+
+                    <span class="aviso">
+                    ${v.fecha} ${v.hora}
+                    </span>
+
+                </div>
+
+                <button
+                class="small danger"
+                onclick="eliminarVenta(${v.id})">
+                🗑️
+                </button>
+
+            </div>
+
+            `;
+
+        });
+
+    }
+
+
+    document.getElementById(
+        "listaVentas"
+    ).innerHTML=listaVentas;
+
+
+    /* COMPRAS */
+
+    let listaCompras="";
+
+
+    if(compras.length===0){
+
+        listaCompras=
+        "<p style='color:#888;text-align:center'>"+
+        "Sin compras hoy"+
+        "</p>";
+
+    }else{
+
+        compras.forEach(c=>{
+
+            listaCompras+=`
+
+            <div class="item">
+
+                <div>
+
+                    <strong>
+                    ${escapeHTML(c.nombre)}
+                    </strong>
+
+                    × ${c.cantidad}
+
+                    <br>
+
+                    💰 $${c.total.toFixed(2)}
+
+                </div>
+
+            </div>
+
+            `;
+
+        });
+
+    }
+
+
+    document.getElementById(
+        "listaCompras"
+    ).innerHTML=listaCompras;
+
+
+    /* GASTOS */
+
+    let listaGastos="";
+
+
+    if(gastos.length===0){
+
+        listaGastos=
+        "<p style='color:#888;text-align:center'>"+
+        "Sin gastos hoy"+
+        "</p>";
+
+    }else{
+
+        gastos.forEach(g=>{
+
+            listaGastos+=`
+
+            <div class="item">
+
+                <div>
+
+                    <strong>
+                    ${escapeHTML(g.descripcion)}
+                    </strong>
+
+                    <br>
+
+                    💸 $${g.monto.toFixed(2)}
+
+                </div>
+
+                <button
+                class="small danger"
+                onclick="eliminarGasto(${g.id})">
+                🗑️
+                </button>
+
+            </div>
+
+            `;
+
+        });
+
+    }
+
+
+    document.getElementById(
+        "listaGastos"
+    ).innerHTML=listaGastos;
+
+
+    /* RESUMEN POR PRODUCTO */
+
+    const resumen={};
+
+
+    ventas.forEach(v=>{
+
+        if(!resumen[v.nombre]){
+
+            resumen[v.nombre]={
+                cantidad:0,
+                total:0
+            };
+
+        }
+
+        resumen[v.nombre].cantidad +=
+        v.cantidad;
+
+        resumen[v.nombre].total +=
+        v.total;
+
+    });
+
+
+    let resumenHTML="<h3>🍺 Ventas por producto</h3>";
+
+
+    if(Object.keys(resumen).length===0){
+
+        resumenHTML+=
+        "<p style='color:#888'>Sin ventas hoy</p>";
+
+    }else{
+
+        for(const nombre in resumen){
+
+            const d=resumen[nombre];
+
+            resumenHTML+=`
+
+            <p>
+            • <strong>${escapeHTML(nombre)}</strong>:
+            ${d.cantidad} unidades =
+            $${d.total.toFixed(2)}
+            </p>
+
+            `;
+
+        }
+
+    }
+
+
+    document.getElementById(
+        "resumenProductos"
+    ).innerHTML=resumenHTML;
+
+
+    /* TOTALES */
+
+    const totalVentas =
+    ventas.reduce(
+        (s,v)=>s+v.total,
+        0
+    );
+
+
+    const totalCompras =
+    compras.reduce(
+        (s,c)=>s+c.total,
+        0
+    );
+
+
+    const totalGastos =
+    gastos.reduce(
+        (s,g)=>s+g.monto,
+        0
+    );
+
+
+    const costo =
+    ventas.reduce(
+        (s,v)=>s+v.costoTotal,
+        0
+    );
+
+
+    const ganancia =
+    totalVentas -
+    costo -
+    totalGastos;
+
+
+    const caja =
+    cajaInicial +
+    totalVentas -
+    totalCompras -
+    totalGastos;
+
+
+    document.getElementById(
+        "totalVentas"
+    ).textContent=
+    "$"+totalVentas.toFixed(2);
+
+
+    document.getElementById(
+        "totalCompras"
+    ).textContent=
+    "$"+totalCompras.toFixed(2);
+
+
+    document.getElementById(
+        "totalGastos"
+    ).textContent=
+    "$"+totalGastos.toFixed(2);
+
+
+    document.getElementById(
+        "costoVendido"
+    ).textContent=
+    "$"+costo.toFixed(2);
+
+
+    document.getElementById(
+        "ganancia"
+    ).textContent=
+    "$"+ganancia.toFixed(2);
+
+
+    document.getElementById(
+        "ganancia"
+    ).className=
+    ganancia>=0
+    ? "ganancia"
+    : "perdida";
+
+
+    document.getElementById(
+        "cajaInicial"
+    ).textContent=
+    "$"+cajaInicial.toFixed(2);
+
+
+    document.getElementById(
+        "dineroCaja"
+    ).textContent=
+    "$"+caja.toFixed(2);
+
+
+    /* HISTORIAL */
+
+    actualizarHistorial();
+}
+
+
+/* =========================================================
+   HISTORIAL
+   ========================================================= */
+
+function actualizarHistorial(){
+
+    let html="";
+
+
+    if(historial.length===0){
+
+        html=
+        "<p style='color:#888;text-align:center'>"+
+        "Todavía no hay días cerrados"+
+        "</p>";
+
+    }else{
+
+        historial.forEach(d=>{
+
+            html+=`
+
+            <div class="historial">
+
+                <strong>📅 ${d.fecha}</strong>
+
+                <hr style="margin:8px 0;border:none;border-top:1px solid #ddd">
+
+                <p>💰 Ventas:
+                $${d.ventas.toFixed(2)}</p>
+
+                <p>🛒 Compras:
+                $${d.compras.toFixed(2)}</p>
+
+                <p>💸 Gastos:
+                $${d.gastos.toFixed(2)}</p>
+
+                <p>📦 Costo vendido:
+                $${d.costo.toFixed(2)}</p>
+
+                <p>
+                <strong>
+                ✅ Ganancia:
+                $${d.ganancia.toFixed(2)}
+                </strong>
+                </p>
+
+                <p>
+                💵 Caja final:
+                $${d.cajaFinal.toFixed(2)}
+                </p>
+
+            </div>
+
+            `;
+
+        });
+
+    }
+
+
+    document.getElementById(
+        "listaHistorial"
+    ).innerHTML=html;
+}
+
+
+/* =========================================================
+   SEGURIDAD
+   ========================================================= */
+
+function escapeHTML(text){
+
+    return String(text)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+
+}
+
+
+/* =========================================================
+   INICIAR
+   ========================================================= */
+
+actualizar();
+
+</script>
+
+</body>
+</html>
