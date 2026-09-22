@@ -164,6 +164,7 @@ button.gris{background:#6b7280}
 <button class="tab active" onclick="mostrar('productos',this)">Productos</button>
 <button class="tab" onclick="mostrar('compras',this)">Compras</button>
 <button class="tab" onclick="mostrar('ventas',this)">Ventas</button>
+<button class="tab" onclick="mostrar('movimientos',this)">Caja / Cambios</button>
 <button class="tab" onclick="mostrar('gastos',this)">Gastos</button>
 <button class="tab" onclick="mostrar('resumen',this)">Resumen</button>
 <button class="tab" onclick="mostrar('historial',this)">Historial</button>
@@ -261,6 +262,11 @@ min="1"
 step="1"
 placeholder="Cantidad vendida">
 
+<select id="metodoVenta">
+<option value="efectivo">💵 Efectivo</option>
+<option value="transferencia">📲 Transferencia</option>
+</select>
+
 <button onclick="registrarVenta()">
 Registrar Venta
 </button>
@@ -272,6 +278,41 @@ Registrar Venta
 <h2>📋 Ventas del día</h2>
 
 <div id="listaVentas"></div>
+
+</div>
+
+</div>
+
+
+<!-- MOVIMIENTOS DE CAJA -->
+
+<div id="movimientos" class="oculto">
+
+<div class="card">
+
+<h2>🔄 Cambio de efectivo por transferencia</h2>
+
+<p class="aviso">
+No es una venta. La persona te transfiere dinero y tú le entregas
+efectivo de la caja. Se registra por separado y NO aumenta las ventas.
+</p>
+
+<input id="montoCambio" type="number" min="0.01" step="0.01"
+placeholder="Monto que entregarás en efectivo">
+
+<input id="notaCambio" type="text"
+placeholder="Nota (opcional)">
+
+<button class="verde" onclick="registrarCambioEfectivo()">
+Registrar cambio
+</button>
+
+</div>
+
+<div class="card">
+
+<h2>📋 Cambios de efectivo de hoy</h2>
+<div id="listaMovimientos"></div>
 
 </div>
 
@@ -328,6 +369,21 @@ Registrar Gasto
 <p>
 <strong>💰 Ventas:</strong>
 <span id="totalVentas">$0.00</span>
+</p>
+
+<p>
+<strong>💵 Ventas en efectivo:</strong>
+<span id="totalVentasEfectivo">$0.00</span>
+</p>
+
+<p>
+<strong>📲 Ventas por transferencia:</strong>
+<span id="totalVentasTransferencia">$0.00</span>
+</p>
+
+<p>
+<strong>🔄 Transferencias por cambio de efectivo:</strong>
+<span id="totalCambiosTransferencia">$0.00</span>
 </p>
 
 <p>
@@ -426,6 +482,9 @@ JSON.parse(localStorage.getItem("cantina_compras_v3")) || [];
 let gastos =
 JSON.parse(localStorage.getItem("cantina_gastos_v3")) || [];
 
+let movimientos =
+JSON.parse(localStorage.getItem("cantina_movimientos_v3")) || [];
+
 let historial =
 JSON.parse(localStorage.getItem("cantina_historial_v3")) || [];
 
@@ -457,6 +516,11 @@ function guardar(){
     localStorage.setItem(
         "cantina_gastos_v3",
         JSON.stringify(gastos)
+    );
+
+    localStorage.setItem(
+        "cantina_movimientos_v3",
+        JSON.stringify(movimientos)
     );
 
     localStorage.setItem(
@@ -502,6 +566,7 @@ function mostrar(nombre,boton){
         "compras",
         "ventas",
         "gastos",
+        "movimientos",
         "resumen",
         "historial"
     ].forEach(id=>{
@@ -739,6 +804,8 @@ function registrarVenta(){
 
         total:cantidad*producto.precio,
 
+        metodoPago: document.getElementById("metodoVenta").value,
+
         costoTotal:cantidad*producto.costo,
 
         fecha:fechaActual(),
@@ -806,6 +873,52 @@ function eliminarVenta(id){
     ventas =
     ventas.filter(v=>v.id!==id);
 
+
+    guardar();
+    actualizar();
+}
+
+
+/* =========================================================
+   CAMBIO DE EFECTIVO POR TRANSFERENCIA (NO VENTA)
+   ========================================================= */
+
+function registrarCambioEfectivo(){
+
+    const monto = Number(document.getElementById("montoCambio").value);
+    const nota = document.getElementById("notaCambio").value.trim();
+
+    if(!monto || monto <= 0){
+        alert("Ingresa un monto válido.");
+        return;
+    }
+
+    movimientos.unshift({
+        id: Date.now(),
+        monto: monto,
+        nota: nota || "Cambio de efectivo",
+        fecha: fechaActual(),
+        hora: new Date().toLocaleTimeString("es-MX")
+    });
+
+    guardar();
+    actualizar();
+
+    document.getElementById("montoCambio").value="";
+    document.getElementById("notaCambio").value="";
+
+    alert(
+        "✅ Cambio registrado.\n\n"+
+        "La transferencia quedó separada de las ventas.\n"+
+        "La caja disminuyó $"+monto.toFixed(2)+"."
+    );
+}
+
+function eliminarMovimiento(id){
+
+    if(!confirm("¿Eliminar este cambio de efectivo?")) return;
+
+    movimientos = movimientos.filter(m=>m.id!==id);
 
     guardar();
     actualizar();
@@ -965,11 +1078,20 @@ function nuevoDia(){
     totalGastos;
 
 
+    const ventasEfectivo =
+    ventas
+    .filter(v => (v.metodoPago || "efectivo") === "efectivo")
+    .reduce((s,v)=>s+v.total,0);
+
+    const totalCambios =
+    movimientos.reduce((s,m)=>s+m.monto,0);
+
     const cajaFinal =
     cajaInicial +
-    totalVentas -
+    ventasEfectivo -
     totalCompras -
-    totalGastos;
+    totalGastos -
+    totalCambios;
 
 
     if(!confirm(
@@ -1031,6 +1153,14 @@ function nuevoDia(){
 
         cajaInicial:cajaInicial,
 
+        ventasEfectivo:ventasEfectivo,
+
+        ventasTransferencia:ventas
+        .filter(v => (v.metodoPago || "efectivo") === "transferencia")
+        .reduce((s,v)=>s+v.total,0),
+
+        cambiosTransferencia:totalCambios,
+
         cajaFinal:cajaFinal
 
     });
@@ -1044,6 +1174,7 @@ function nuevoDia(){
     ventas=[];
     compras=[];
     gastos=[];
+    movimientos=[];
 
     cajaInicial=0;
 
@@ -1065,6 +1196,73 @@ function nuevoDia(){
         "📚 Resumen guardado en historial.\n\n"+
         "El nuevo día comienza con exactamente "+
         "el inventario que quedó."
+    );
+}
+
+
+/* =========================================================
+   EDITAR PRODUCTO / PRECIO
+   ========================================================= */
+
+function editarProducto(id){
+
+    const producto = productos.find(p=>p.id===id);
+    if(!producto) return;
+
+    const nuevoPrecio = prompt(
+        "Precio de venta de " + producto.nombre + ":",
+        producto.precio
+    );
+
+    if(nuevoPrecio===null) return;
+
+    const precio = Number(nuevoPrecio);
+
+    if(!isFinite(precio) || precio < 0){
+        alert("Precio inválido.");
+        return;
+    }
+
+    producto.precio = precio;
+
+    guardar();
+    actualizar();
+
+    alert(
+        "✅ Precio actualizado.\n\n"+
+        producto.nombre+
+        ": $"+precio.toFixed(2)
+    );
+}
+
+function editarCosto(id){
+
+    const producto = productos.find(p=>p.id===id);
+    if(!producto) return;
+
+    const nuevoCosto = prompt(
+        "Costo de compra de " + producto.nombre + ":",
+        producto.costo
+    );
+
+    if(nuevoCosto===null) return;
+
+    const costo = Number(nuevoCosto);
+
+    if(!isFinite(costo) || costo < 0){
+        alert("Costo inválido.");
+        return;
+    }
+
+    producto.costo = costo;
+
+    guardar();
+    actualizar();
+
+    alert(
+        "✅ Costo actualizado.\n\n"+
+        producto.nombre+
+        ": $"+costo.toFixed(2)
     );
 }
 
@@ -1130,6 +1328,16 @@ function actualizar(){
                     <span class="ganancia">
                     $${(p.precio-p.costo).toFixed(2)}
                     </span>
+
+                    <br><br>
+
+                    <button class="small" onclick="editarProducto(${p.id})">
+                    ✏️ Cambiar precio
+                    </button>
+
+                    <button class="small gris" onclick="editarCosto(${p.id})">
+                    ✏️ Cambiar costo
+                    </button>
 
                 </div>
 
@@ -1225,6 +1433,12 @@ function actualizar(){
 
                     <br>
 
+                    ${((v.metodoPago || "efectivo") === "transferencia")
+                      ? "📲 Transferencia"
+                      : "💵 Efectivo"}
+
+                    <br>
+
                     <span class="aviso">
                     ${v.fecha} ${v.hora}
                     </span>
@@ -1297,6 +1511,64 @@ function actualizar(){
     document.getElementById(
         "listaCompras"
     ).innerHTML=listaCompras;
+
+
+    /* MOVIMIENTOS DE CAJA */
+
+    let listaMovimientos="";
+
+    if(movimientos.length===0){
+
+        listaMovimientos =
+        "<p style='color:#888;text-align:center'>"+
+        "Sin cambios de efectivo hoy"+
+        "</p>";
+
+    }else{
+
+        movimientos.forEach(m=>{
+
+            listaMovimientos += `
+
+            <div class="item">
+
+                <div>
+
+                    <strong>🔄 ${escapeHTML(m.nota)}</strong>
+
+                    <br>
+
+                    📲 Transferencia recibida:
+                    $${m.monto.toFixed(2)}
+
+                    <br>
+
+                    💵 Efectivo entregado:
+                    $${m.monto.toFixed(2)}
+
+                    <br>
+
+                    <span class="aviso">
+                    ${m.fecha} ${m.hora}
+                    </span>
+
+                </div>
+
+                <button class="small danger"
+                onclick="eliminarMovimiento(${m.id})">
+                🗑️
+                </button>
+
+            </div>
+
+            `;
+
+        });
+
+    }
+
+    document.getElementById("listaMovimientos").innerHTML =
+    listaMovimientos;
 
 
     /* GASTOS */
@@ -1446,11 +1718,25 @@ function actualizar(){
     totalGastos;
 
 
+    const ventasEfectivo =
+    ventas
+    .filter(v => (v.metodoPago || "efectivo") === "efectivo")
+    .reduce((s,v)=>s+v.total,0);
+
+    const ventasTransferencia =
+    ventas
+    .filter(v => (v.metodoPago || "efectivo") === "transferencia")
+    .reduce((s,v)=>s+v.total,0);
+
+    const totalCambios =
+    movimientos.reduce((s,m)=>s+m.monto,0);
+
     const caja =
     cajaInicial +
-    totalVentas -
+    ventasEfectivo -
     totalCompras -
-    totalGastos;
+    totalGastos -
+    totalCambios;
 
 
     document.getElementById(
@@ -1458,6 +1744,21 @@ function actualizar(){
     ).textContent=
     "$"+totalVentas.toFixed(2);
 
+
+    document.getElementById(
+        "totalVentasEfectivo"
+    ).textContent=
+    "$"+ventasEfectivo.toFixed(2);
+
+    document.getElementById(
+        "totalVentasTransferencia"
+    ).textContent=
+    "$"+ventasTransferencia.toFixed(2);
+
+    document.getElementById(
+        "totalCambiosTransferencia"
+    ).textContent=
+    "$"+totalCambios.toFixed(2);
 
     document.getElementById(
         "totalCompras"
