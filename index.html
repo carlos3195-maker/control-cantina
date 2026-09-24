@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Cantina</title>
+<title>Control de Cantina — v4</title>
 
 <style>
 *{box-sizing:border-box;font-family:Arial,sans-serif;margin:0;padding:0}
@@ -148,6 +148,63 @@ button.gris{background:#6b7280}
     border-radius:8px;
     padding:12px;
     margin-bottom:10px
+}
+
+.resumen-bloque{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:8px;
+    padding:10px;
+    margin-top:8px
+}
+
+.dato,.dato-grande{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:9px 0;
+    border-bottom:1px solid #eee
+}
+
+.dato:last-child{border-bottom:none}
+
+.dato-grande{
+    font-size:17px;
+    padding:12px 0
+}
+
+.dato-grande strong{
+    font-size:20px
+}
+
+.destacado{
+    background:#dcfce7;
+    margin:5px -5px;
+    padding:12px 8px;
+    border-radius:8px;
+    color:#166534;
+    border-bottom:none
+}
+
+.producto-resumen{
+    padding:9px 0;
+    border-bottom:1px solid #eee
+}
+
+.producto-resumen:last-child{border-bottom:none}
+
+.producto-resumen-top{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    font-weight:bold
+}
+
+.producto-resumen-detail{
+    color:#555;
+    font-size:13px;
+    margin-top:4px
 }
 </style>
 </head>
@@ -362,67 +419,79 @@ Registrar Gasto
 
 <h2>📊 Resumen del Día</h2>
 
+<div class="resumen-bloque">
+<h3>🍺 Lo vendido por producto</h3>
 <div id="resumenProductos"></div>
+</div>
 
 <div class="divider"></div>
 
-<p>
-<strong>💰 Ventas:</strong>
-<span id="totalVentas">$0.00</span>
-</p>
-
-<p>
-<strong>💵 Ventas en efectivo:</strong>
-<span id="totalVentasEfectivo">$0.00</span>
-</p>
-
-<p>
-<strong>📲 Ventas por transferencia:</strong>
-<span id="totalVentasTransferencia">$0.00</span>
-</p>
-
-<p>
-<strong>🔄 Transferencias por cambio de efectivo:</strong>
-<span id="totalCambiosTransferencia">$0.00</span>
-</p>
-
-<p>
-<strong>🛒 Compras:</strong>
-<span id="totalCompras">$0.00</span>
-</p>
-
-<p>
-<strong>💸 Gastos:</strong>
-<span id="totalGastos">$0.00</span>
-</p>
+<h3>💰 Dinero de las ventas</h3>
+<div class="dato-grande">
+<span>💰 Total vendido</span>
+<strong id="totalVentas">$0.00</strong>
+</div>
+<div class="dato">
+<span>💵 Efectivo</span>
+<strong id="totalVentasEfectivo">$0.00</strong>
+</div>
+<div class="dato">
+<span>📲 Transferencias de ventas</span>
+<strong id="totalVentasTransferencia">$0.00</strong>
+</div>
 
 <div class="divider"></div>
 
-<p>
-<strong>📦 Costo de mercancía vendida:</strong>
-<span id="costoVendido">$0.00</span>
-</p>
+<h3>💸 Salidas que afectan la caja</h3>
+<div class="dato">
+<span>🛒 Compras</span>
+<strong id="totalCompras">$0.00</strong>
+</div>
+<div class="dato">
+<span>💸 Gastos</span>
+<strong id="totalGastos">$0.00</strong>
+</div>
+<div class="dato">
+<span>🔄 Efectivo entregado por cambios</span>
+<strong id="totalCambiosTransferencia">$0.00</strong>
+</div>
 
-<p>
-<strong>✅ Ganancia neta:</strong>
-<span id="ganancia">$0.00</span>
+<p class="aviso">
+🔄 Los cambios de efectivo NO son ventas y NO se suman a las
+transferencias de ventas.
 </p>
 
 <div class="divider"></div>
 
-<h3>💵 Caja</h3>
+<h3>📈 Ganancia</h3>
+<div class="dato">
+<span>📦 Costo de mercancía vendida</span>
+<strong id="costoVendido">$0.00</strong>
+</div>
+<div class="dato destacado">
+<span>✅ Ganancia neta</span>
+<strong id="ganancia">$0.00</strong>
+</div>
+
+<div class="divider"></div>
+
+<h3>💵 Dinero esperado en caja</h3>
 
 <button class="verde" onclick="ponerCajaInicial()">
-Registrar dinero inicial de caja
+💵 Registrar / cambiar dinero inicial
 </button>
 
-<p>
-Dinero inicial:
+<div class="dato">
+<span>Dinero inicial</span>
 <strong id="cajaInicial">$0.00</strong>
-</p>
+</div>
 
-<p class="efectivo" id="dineroCaja">
-$0.00
+<p class="efectivo" id="dineroCaja">$0.00</p>
+
+<p class="aviso">
+Fórmula: dinero inicial + ventas en efectivo − compras − gastos − efectivo entregado por cambios.
+<br>
+Las ventas por transferencia NO entran a la caja física.
 </p>
 
 <div class="divider"></div>
@@ -432,10 +501,10 @@ $0.00
 </button>
 
 <p class="aviso">
-⚠️ Este botón guarda el resumen del día y limpia únicamente
-las ventas, compras y gastos del día.
+⚠️ Al cerrar el día se guarda el resumen y se limpian solo
+las operaciones del día.
 <br><br>
-<strong>📦 EL INVENTARIO NO SE BORRA NI SE MODIFICA.</strong>
+<strong>📦 EL INVENTARIO QUEDA EXACTAMENTE COMO ESTÁ.</strong>
 </p>
 
 </div>
@@ -1664,11 +1733,19 @@ function actualizar(){
 
             resumenHTML+=`
 
-            <p>
-            • <strong>${escapeHTML(nombre)}</strong>:
-            ${d.cantidad} unidades =
-            $${d.total.toFixed(2)}
-            </p>
+            <div class="producto-resumen">
+
+                <div class="producto-resumen-top">
+                    <span>🍺 ${escapeHTML(nombre)}</span>
+                    <span>$${d.total.toFixed(2)}</span>
+                </div>
+
+                <div class="producto-resumen-detail">
+                    ${d.cantidad} unidad${d.cantidad===1 ? "" : "es"}
+                    × $${(d.total/d.cantidad).toFixed(2)}
+                </div>
+
+            </div>
 
             `;
 
@@ -1840,6 +1917,15 @@ function actualizarHistorial(){
 
                 <p>💰 Ventas:
                 $${d.ventas.toFixed(2)}</p>
+
+                <p>💵 Efectivo de ventas:
+                $${(d.ventasEfectivo || 0).toFixed(2)}</p>
+
+                <p>📲 Transferencias de ventas:
+                $${(d.ventasTransferencia || 0).toFixed(2)}</p>
+
+                <p>🔄 Cambios de efectivo:
+                $${(d.cambiosTransferencia || 0).toFixed(2)}</p>
 
                 <p>🛒 Compras:
                 $${d.compras.toFixed(2)}</p>
