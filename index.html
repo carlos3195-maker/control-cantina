@@ -27,7 +27,7 @@ h3{font-size:15px;color:#555;margin:12px 0 6px}
     box-shadow:0 2px 5px rgba(0,0,0,.1)
 }
 
-input,button,select{
+input,button,select,textarea{
     width:100%;
     padding:12px;
     margin:6px 0;
@@ -225,6 +225,7 @@ button.gris{background:#6b7280}
 <button class="tab" onclick="mostrar('gastos',this)">Gastos</button>
 <button class="tab" onclick="mostrar('resumen',this)">Resumen</button>
 <button class="tab" onclick="mostrar('historial',this)">Historial</button>
+<button class="tab" onclick="mostrar('recetas',this)">Recetas</button>
 </div>
 
 
@@ -468,6 +469,10 @@ transferencias de ventas.
 <span>📦 Costo de mercancía vendida</span>
 <strong id="costoVendido">$0.00</strong>
 </div>
+<div class="dato">
+<span>🧾 Ventas - costo - gastos</span>
+<strong id="gananciaOperativa">$0.00</strong>
+</div>
 <div class="dato destacado">
 <span>✅ Ganancia neta</span>
 <strong id="ganancia">$0.00</strong>
@@ -507,6 +512,27 @@ las operaciones del día.
 <strong>📦 EL INVENTARIO QUEDA EXACTAMENTE COMO ESTÁ.</strong>
 </p>
 
+</div>
+
+</div>
+
+
+<!-- RECETAS -->
+
+<div id="recetas" class="oculto">
+
+<div class="card">
+<h2>🍹 Recetas / Preparaciones</h2>
+<p class="aviso">Guarda recetas y consulta el costo estimado por preparación usando los productos de tu inventario.</p>
+<input id="nombreReceta" type="text" placeholder="Nombre de la receta">
+<textarea id="ingredientesReceta" rows="5" placeholder="Ingredientes y cantidades, por ejemplo: 1 refresco + 50 ml de jarabe"></textarea>
+<input id="costoReceta" type="number" min="0" step="0.01" placeholder="Costo estimado por preparación">
+<button onclick="agregarReceta()">Guardar receta</button>
+</div>
+
+<div class="card">
+<h2>📋 Mis recetas</h2>
+<div id="listaRecetas"></div>
 </div>
 
 </div>
@@ -560,6 +586,9 @@ JSON.parse(localStorage.getItem("cantina_historial_v3")) || [];
 let cajaInicial =
 Number(localStorage.getItem("cantina_caja_v3")) || 0;
 
+let recetas =
+JSON.parse(localStorage.getItem("cantina_recetas_v1")) || [];
+
 
 /* =========================================================
    GUARDAR
@@ -601,6 +630,11 @@ function guardar(){
         "cantina_caja_v3",
         cajaInicial
     );
+
+    localStorage.setItem(
+        "cantina_recetas_v1",
+        JSON.stringify(recetas)
+    );
 }
 
 
@@ -637,7 +671,8 @@ function mostrar(nombre,boton){
         "gastos",
         "movimientos",
         "resumen",
-        "historial"
+        "historial",
+        "recetas"
     ].forEach(id=>{
         document.getElementById(id)
         .classList.add("oculto");
@@ -1230,6 +1265,14 @@ function nuevoDia(){
 
         cambiosTransferencia:totalCambios,
 
+        productosVendidos: ventas.reduce((acc,v)=>{
+            const key=v.productoId || v.nombre;
+            if(!acc[key]) acc[key]={nombre:v.nombre,cantidad:0,total:0};
+            acc[key].cantidad += v.cantidad;
+            acc[key].total += v.total;
+            return acc;
+        },{}),
+
         cajaFinal:cajaFinal
 
     });
@@ -1691,6 +1734,16 @@ function actualizar(){
         "listaGastos"
     ).innerHTML=listaGastos;
 
+    let listaRecetas="";
+    if(recetas.length===0){
+        listaRecetas="<p style='color:#888;text-align:center'>Sin recetas guardadas</p>";
+    }else{
+        recetas.forEach(r=>{
+            listaRecetas+=`<div class="historial"><strong>🍹 ${escapeHTML(r.nombre)}</strong><p style="white-space:pre-wrap;margin-top:7px">${escapeHTML(r.ingredientes)}</p><p>💰 Costo estimado: $${Number(r.costo||0).toFixed(2)}</p><button class="small danger" onclick="eliminarReceta(${r.id})">🗑️ Eliminar</button></div>`;
+        });
+    }
+    document.getElementById("listaRecetas").innerHTML=listaRecetas;
+
 
     /* RESUMEN POR PRODUCTO */
 
@@ -1855,6 +1908,9 @@ function actualizar(){
     "$"+costo.toFixed(2);
 
 
+    document.getElementById("gananciaOperativa").textContent=
+    "$"+ganancia.toFixed(2);
+
     document.getElementById(
         "ganancia"
     ).textContent=
@@ -1891,6 +1947,28 @@ function actualizar(){
    HISTORIAL
    ========================================================= */
 
+function agregarReceta(){
+    const nombre=document.getElementById("nombreReceta").value.trim();
+    const ingredientes=document.getElementById("ingredientesReceta").value.trim();
+    const costo=Number(document.getElementById("costoReceta").value)||0;
+    if(!nombre || !ingredientes){ alert("Escribe el nombre y los ingredientes."); return; }
+    recetas.unshift({id:Date.now(),nombre,ingredientes,costo});
+    guardar(); actualizar();
+    document.getElementById("nombreReceta").value="";
+    document.getElementById("ingredientesReceta").value="";
+    document.getElementById("costoReceta").value="";
+}
+
+function eliminarReceta(id){
+    if(!confirm("¿Eliminar esta receta?")) return;
+    recetas=recetas.filter(r=>r.id!==id); guardar(); actualizar();
+}
+
+function renderProductosHistorial(productosVendidos){
+    if(!productosVendidos || Object.keys(productosVendidos).length===0) return '<p class="aviso">Sin ventas de productos.</p>';
+    return Object.values(productosVendidos).map(x=>`<div class="producto-resumen"><div class="producto-resumen-top"><span>${escapeHTML(x.nombre)}</span><span>${x.cantidad} und.</span></div><div class="producto-resumen-detail">Ventas: $${x.total.toFixed(2)}</div></div>`).join('');
+}
+
 function actualizarHistorial(){
 
     let html="";
@@ -1923,6 +2001,11 @@ function actualizarHistorial(){
 
                 <p>📲 Transferencias de ventas:
                 $${(d.ventasTransferencia || 0).toFixed(2)}</p>
+
+                <div class="resumen-bloque">
+                    <strong>🍺 Productos vendidos</strong>
+                    ${renderProductosHistorial(d.productosVendidos)}
+                </div>
 
                 <p>🔄 Cambios de efectivo:
                 $${(d.cambiosTransferencia || 0).toFixed(2)}</p>
