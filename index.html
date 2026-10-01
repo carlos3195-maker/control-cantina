@@ -281,11 +281,46 @@ NO modifica las existencias.
 
 <select id="productoCompra"></select>
 
+<select id="tipoCompra" onchange="actualizarCamposCompra()">
+<option value="unidad">📦 Compra por unidad</option>
+<option value="caja">🗃️ Compra por caja</option>
+</select>
+
+<div id="compraUnidadCampos">
 <input id="cantidadCompra"
 type="number"
 min="1"
 step="1"
-placeholder="Cantidad comprada">
+placeholder="Cantidad de unidades compradas">
+
+<input id="costoCompraUnidad"
+type="number"
+min="0"
+step="0.01"
+placeholder="Costo por unidad (opcional)">
+</div>
+
+<div id="compraCajaCampos" class="oculto">
+<input id="cantidadCajas"
+type="number"
+min="1"
+step="1"
+placeholder="Cantidad de cajas">
+
+<input id="unidadesPorCaja"
+type="number"
+min="1"
+step="1"
+placeholder="Unidades que trae cada caja">
+
+<input id="costoCaja"
+type="number"
+min="0"
+step="0.01"
+placeholder="Costo de cada caja">
+</div>
+
+<p id="detalleCompra" class="aviso"></p>
 
 <button onclick="registrarCompra()">
 Registrar Compra
@@ -756,79 +791,137 @@ function agregarProducto(){
    COMPRA
    ========================================================= */
 
+function actualizarCamposCompra(){
+
+    const tipo=document.getElementById("tipoCompra").value;
+    document.getElementById("compraUnidadCampos")
+        .classList.toggle("oculto",tipo!=="unidad");
+    document.getElementById("compraCajaCampos")
+        .classList.toggle("oculto",tipo!=="caja");
+
+    actualizarDetalleCompra();
+}
+
+function actualizarDetalleCompra(){
+
+    const tipo=document.getElementById("tipoCompra").value;
+    const detalle=document.getElementById("detalleCompra");
+
+    if(tipo==="unidad"){
+        const cantidad=Number(document.getElementById("cantidadCompra").value)||0;
+        const costo=Number(document.getElementById("costoCompraUnidad").value);
+        detalle.textContent = cantidad>0 && costo>=0 && isFinite(costo)
+            ? `Total compra: $${(cantidad*costo).toFixed(2)} · ${cantidad} unidad(es)`
+            : "Puedes dejar el costo vacío para usar el costo actual del producto.";
+    }else{
+        const cajas=Number(document.getElementById("cantidadCajas").value)||0;
+        const unidades=Number(document.getElementById("unidadesPorCaja").value)||0;
+        const costoCaja=Number(document.getElementById("costoCaja").value);
+        if(cajas>0 && unidades>0 && costoCaja>=0 && isFinite(costoCaja)){
+            const totalUnidades=cajas*unidades;
+            const costoUnidad=costoCaja/unidades;
+            detalle.textContent=`Recibirás ${totalUnidades} unidades · Costo por unidad: $${costoUnidad.toFixed(2)} · Total: $${(cajas*costoCaja).toFixed(2)}`;
+        }else{
+            detalle.textContent="Ejemplo: 1 caja × 12 unidades × $420 = 12 unidades a $35 de costo c/u.";
+        }
+    }
+}
+
 function registrarCompra(){
 
-    const id =
-    Number(document.getElementById("productoCompra").value);
+    const id=Number(document.getElementById("productoCompra").value);
+    const tipo=document.getElementById("tipoCompra").value;
 
-    const cantidad =
-    Number(document.getElementById("cantidadCompra").value);
-
-
-    if(
-        !id ||
-        !cantidad ||
-        cantidad<=0
-    ){
-
-        alert("Selecciona un producto y una cantidad.");
+    if(!id){
+        alert("Selecciona un producto.");
         return;
     }
 
-
-    const producto =
-    productos.find(p=>p.id===id);
-
-
+    const producto=productos.find(p=>p.id===id);
     if(!producto){
-
         alert("Producto no encontrado.");
         return;
     }
 
+    let cantidadUnidades=0;
+    let costoUnitario=Number(producto.costo)||0;
+    let total=0;
+    let detalleCompra="";
 
-    /*
-       AQUÍ ES UNO DE LOS ÚNICOS LUGARES
-       DONDE SE MODIFICA EL INVENTARIO.
-    */
+    if(tipo==="caja"){
+        const cajas=Number(document.getElementById("cantidadCajas").value);
+        const unidadesPorCaja=Number(document.getElementById("unidadesPorCaja").value);
+        const costoCaja=Number(document.getElementById("costoCaja").value);
 
-    producto.stock += cantidad;
+        if(!cajas || cajas<=0 || !unidadesPorCaja || unidadesPorCaja<=0 ||
+           !isFinite(costoCaja) || costoCaja<0){
+            alert("Completa correctamente cajas, unidades por caja y costo de la caja.");
+            return;
+        }
 
+        cantidadUnidades=cajas*unidadesPorCaja;
+        costoUnitario=costoCaja/unidadesPorCaja;
+        total=cajas*costoCaja;
+        detalleCompra=`${cajas} caja(s) × ${unidadesPorCaja} unidades`;
+
+    }else{
+        const cantidad=Number(document.getElementById("cantidadCompra").value);
+        const costoInput=document.getElementById("costoCompraUnidad").value.trim();
+
+        if(!cantidad || cantidad<=0){
+            alert("Ingresa una cantidad de unidades.");
+            return;
+        }
+
+        if(costoInput!==""){
+            costoUnitario=Number(costoInput);
+            if(!isFinite(costoUnitario) || costoUnitario<0){
+                alert("El costo por unidad no es válido.");
+                return;
+            }
+        }
+
+        cantidadUnidades=cantidad;
+        total=cantidadUnidades*costoUnitario;
+        detalleCompra=`${cantidadUnidades} unidad(es)`;
+    }
+
+    producto.stock += cantidadUnidades;
+
+    /* El costo queda expresado SIEMPRE por unidad.
+       Esto permite vender una unidad aunque la compra haya sido por caja. */
+    producto.costo=costoUnitario;
 
     compras.unshift({
-
         id:Date.now(),
-
         productoId:producto.id,
-
         nombre:producto.nombre,
-
-        cantidad:cantidad,
-
-        costo:producto.costo,
-
-        total:cantidad*producto.costo,
-
+        cantidad:cantidadUnidades,
+        tipoCompra:tipo,
+        detalleCompra:detalleCompra,
+        costo:costoUnitario,
+        total:total,
         fecha:fechaActual()
-
     });
-
 
     guardar();
     actualizar();
 
-
     document.getElementById("cantidadCompra").value="";
-
+    document.getElementById("costoCompraUnidad").value="";
+    document.getElementById("cantidadCajas").value="";
+    document.getElementById("unidadesPorCaja").value="";
+    document.getElementById("costoCaja").value="";
+    actualizarDetalleCompra();
 
     alert(
         "✅ Compra registrada.\n\n"+
         producto.nombre+
-        "\nInventario actual: "+
-        producto.stock
+        "\nEntrada al inventario: "+cantidadUnidades+" unidades"+
+        "\nCosto por unidad: $"+costoUnitario.toFixed(2)+
+        "\nInventario actual: "+producto.stock
     );
 }
-
 
 /* =========================================================
    VENTA
@@ -1267,9 +1360,11 @@ function nuevoDia(){
 
         productosVendidos: ventas.reduce((acc,v)=>{
             const key=v.productoId || v.nombre;
-            if(!acc[key]) acc[key]={nombre:v.nombre,cantidad:0,total:0};
+            if(!acc[key]) acc[key]={nombre:v.nombre,cantidad:0,total:0,costo:0,ganancia:0};
             acc[key].cantidad += v.cantidad;
             acc[key].total += v.total;
+            acc[key].costo += Number(v.costoTotal || 0);
+            acc[key].ganancia += Number(v.total || 0) - Number(v.costoTotal || 0);
             return acc;
         },{}),
 
@@ -1603,11 +1698,19 @@ function actualizar(){
                     ${escapeHTML(c.nombre)}
                     </strong>
 
-                    × ${c.cantidad}
+                    × ${c.cantidad} unidades
 
                     <br>
 
-                    💰 $${c.total.toFixed(2)}
+                    ${c.tipoCompra === "caja" ? "🗃️ "+escapeHTML(c.detalleCompra || "Compra por caja") : "📦 Compra por unidad"}
+
+                    <br>
+
+                    💵 Costo unitario: $${Number(c.costo || 0).toFixed(2)}
+
+                    <br>
+
+                    💰 Total: $${Number(c.total || 0).toFixed(2)}
 
                 </div>
 
@@ -1966,7 +2069,10 @@ function eliminarReceta(id){
 
 function renderProductosHistorial(productosVendidos){
     if(!productosVendidos || Object.keys(productosVendidos).length===0) return '<p class="aviso">Sin ventas de productos.</p>';
-    return Object.values(productosVendidos).map(x=>`<div class="producto-resumen"><div class="producto-resumen-top"><span>${escapeHTML(x.nombre)}</span><span>${x.cantidad} und.</span></div><div class="producto-resumen-detail">Ventas: $${x.total.toFixed(2)}</div></div>`).join('');
+    return Object.values(productosVendidos).map(x=>`<div class="producto-resumen"><div class="producto-resumen-top"><span>${escapeHTML(x.nombre)}</span><span>${x.cantidad} und.</span></div><div class="producto-resumen-detail">
+Ventas: $${x.total.toFixed(2)} · Costo: $${Number(x.costo || 0).toFixed(2)}
+<br>Ganancia: $${Number(x.ganancia || 0).toFixed(2)}
+</div></div>`).join('');
 }
 
 function actualizarHistorial(){
@@ -2066,6 +2172,13 @@ function escapeHTML(text){
    INICIAR
    ========================================================= */
 
+document.getElementById("cantidadCompra").addEventListener("input",actualizarDetalleCompra);
+document.getElementById("costoCompraUnidad").addEventListener("input",actualizarDetalleCompra);
+document.getElementById("cantidadCajas").addEventListener("input",actualizarDetalleCompra);
+document.getElementById("unidadesPorCaja").addEventListener("input",actualizarDetalleCompra);
+document.getElementById("costoCaja").addEventListener("input",actualizarDetalleCompra);
+
+actualizarDetalleCompra();
 actualizar();
 
 </script>
