@@ -8,3 +8,7 @@ Versión actualizada 24/09/2026.
 - Precios y costos editables.
 - Resumen por producto, ventas, caja y ganancia.
 - Datos guardados en localStorage del navegador.
+
+
+### Nuevo: ajuste manual de inventario
+Desde Inventario puedes usar “📦 Ajustar existencia” para establecer directamente la cantidad física real de cada producto. No se registra como venta ni compra y no altera la ganancia.

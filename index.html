@@ -1475,6 +1475,52 @@ function editarCosto(id){
 
 
 /* =========================================================
+   AJUSTAR EXISTENCIA MANUALMENTE
+   ========================================================= */
+
+function ajustarInventario(id){
+
+    const producto = productos.find(p=>p.id===id);
+    if(!producto) return;
+
+    const nuevoStock = prompt(
+        "Existencia REAL de " + producto.nombre + ":\n\n" +
+        "Inventario actual: " + producto.stock + "\n\n" +
+        "Escribe la cantidad que tienes físicamente:",
+        producto.stock
+    );
+
+    if(nuevoStock===null) return;
+
+    if(nuevoStock.trim()==="" || !/^\d+$/.test(nuevoStock.trim())){
+        alert("Ingresa una cantidad entera válida (0 o mayor).");
+        return;
+    }
+
+    const stock = Number(nuevoStock);
+
+    if(!Number.isSafeInteger(stock) || stock<0){
+        alert("La existencia no es válida.");
+        return;
+    }
+
+    const anterior = producto.stock;
+    producto.stock = stock;
+
+    guardar();
+    actualizar();
+
+    alert(
+        "✅ Inventario actualizado.\n\n" +
+        producto.nombre +
+        "\nAntes: " + anterior +
+        "\nAhora: " + stock +
+        "\n\nEste ajuste no cuenta como venta ni compra y no cambia la ganancia."
+    );
+}
+
+
+/* =========================================================
    ACTUALIZAR INTERFAZ
    ========================================================= */
 
@@ -1544,6 +1590,10 @@ function actualizar(){
 
                     <button class="small gris" onclick="editarCosto(${p.id})">
                     ✏️ Cambiar costo
+                    </button>
+
+                    <button class="small verde" onclick="ajustarInventario(${p.id})">
+                    📦 Ajustar existencia
                     </button>
 
                 </div>
