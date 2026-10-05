@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Cantina</title>
+<title>Control de Cantina — v4</title>
 
 <style>
 *{box-sizing:border-box;font-family:Arial,sans-serif;margin:0;padding:0}
@@ -27,7 +27,7 @@ h3{font-size:15px;color:#555;margin:12px 0 6px}
     box-shadow:0 2px 5px rgba(0,0,0,.1)
 }
 
-input,button,select{
+input,button,select,textarea{
     width:100%;
     padding:12px;
     margin:6px 0;
@@ -149,6 +149,63 @@ button.gris{background:#6b7280}
     padding:12px;
     margin-bottom:10px
 }
+
+.resumen-bloque{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:8px;
+    padding:10px;
+    margin-top:8px
+}
+
+.dato,.dato-grande{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:9px 0;
+    border-bottom:1px solid #eee
+}
+
+.dato:last-child{border-bottom:none}
+
+.dato-grande{
+    font-size:17px;
+    padding:12px 0
+}
+
+.dato-grande strong{
+    font-size:20px
+}
+
+.destacado{
+    background:#dcfce7;
+    margin:5px -5px;
+    padding:12px 8px;
+    border-radius:8px;
+    color:#166534;
+    border-bottom:none
+}
+
+.producto-resumen{
+    padding:9px 0;
+    border-bottom:1px solid #eee
+}
+
+.producto-resumen:last-child{border-bottom:none}
+
+.producto-resumen-top{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    font-weight:bold
+}
+
+.producto-resumen-detail{
+    color:#555;
+    font-size:13px;
+    margin-top:4px
+}
 </style>
 </head>
 
@@ -164,9 +221,11 @@ button.gris{background:#6b7280}
 <button class="tab active" onclick="mostrar('productos',this)">Productos</button>
 <button class="tab" onclick="mostrar('compras',this)">Compras</button>
 <button class="tab" onclick="mostrar('ventas',this)">Ventas</button>
+<button class="tab" onclick="mostrar('movimientos',this)">Caja / Cambios</button>
 <button class="tab" onclick="mostrar('gastos',this)">Gastos</button>
 <button class="tab" onclick="mostrar('resumen',this)">Resumen</button>
 <button class="tab" onclick="mostrar('historial',this)">Historial</button>
+<button class="tab" onclick="mostrar('recetas',this)">Recetas</button>
 </div>
 
 
@@ -222,11 +281,53 @@ NO modifica las existencias.
 
 <select id="productoCompra"></select>
 
+<select id="tipoCompra" onchange="actualizarCamposCompra()">
+<option value="unidad">📦 Compra por unidad</option>
+<option value="caja">🗃️ Compra por caja</option>
+</select>
+
+<input id="proveedorCompra" type="text" placeholder="Proveedor (opcional)">
+
+<select id="estadoCompra">
+<option value="pagada">💵 Compra pagada</option>
+<option value="credito">🧾 Compra a crédito</option>
+</select>
+
+<div id="compraUnidadCampos">
 <input id="cantidadCompra"
 type="number"
 min="1"
 step="1"
-placeholder="Cantidad comprada">
+placeholder="Cantidad de unidades compradas">
+
+<input id="costoCompraUnidad"
+type="number"
+min="0"
+step="0.01"
+placeholder="Costo por unidad (opcional)">
+</div>
+
+<div id="compraCajaCampos" class="oculto">
+<input id="cantidadCajas"
+type="number"
+min="1"
+step="1"
+placeholder="Cantidad de cajas">
+
+<input id="unidadesPorCaja"
+type="number"
+min="1"
+step="1"
+placeholder="Unidades que trae cada caja">
+
+<input id="costoCaja"
+type="number"
+min="0"
+step="0.01"
+placeholder="Costo de cada caja">
+</div>
+
+<p id="detalleCompra" class="aviso"></p>
 
 <button onclick="registrarCompra()">
 Registrar Compra
@@ -236,9 +337,17 @@ Registrar Compra
 
 <div class="card">
 
-<h2>📋 Compras del día</h2>
+<h2>📋 Compras pagadas del día</h2>
 
 <div id="listaCompras"></div>
+
+</div>
+
+<div class="card">
+
+<h2>🧾 Créditos pendientes</h2>
+<p class="aviso">Las compras a crédito entran al inventario inmediatamente. No descuentan caja hasta que registres el pago.</p>
+<div id="listaCreditos"></div>
 
 </div>
 
@@ -261,6 +370,11 @@ min="1"
 step="1"
 placeholder="Cantidad vendida">
 
+<select id="metodoVenta">
+<option value="efectivo">💵 Efectivo</option>
+<option value="transferencia">📲 Transferencia</option>
+</select>
+
 <button onclick="registrarVenta()">
 Registrar Venta
 </button>
@@ -272,6 +386,41 @@ Registrar Venta
 <h2>📋 Ventas del día</h2>
 
 <div id="listaVentas"></div>
+
+</div>
+
+</div>
+
+
+<!-- MOVIMIENTOS DE CAJA -->
+
+<div id="movimientos" class="oculto">
+
+<div class="card">
+
+<h2>🔄 Cambio de efectivo por transferencia</h2>
+
+<p class="aviso">
+No es una venta. La persona te transfiere dinero y tú le entregas
+efectivo de la caja. Se registra por separado y NO aumenta las ventas.
+</p>
+
+<input id="montoCambio" type="number" min="0.01" step="0.01"
+placeholder="Monto que entregarás en efectivo">
+
+<input id="notaCambio" type="text"
+placeholder="Nota (opcional)">
+
+<button class="verde" onclick="registrarCambioEfectivo()">
+Registrar cambio
+</button>
+
+</div>
+
+<div class="card">
+
+<h2>📋 Cambios de efectivo de hoy</h2>
+<div id="listaMovimientos"></div>
 
 </div>
 
@@ -321,52 +470,91 @@ Registrar Gasto
 
 <h2>📊 Resumen del Día</h2>
 
+<div class="resumen-bloque">
+<h3>🍺 Lo vendido por producto</h3>
 <div id="resumenProductos"></div>
+</div>
 
 <div class="divider"></div>
 
-<p>
-<strong>💰 Ventas:</strong>
-<span id="totalVentas">$0.00</span>
-</p>
+<h3>💰 Dinero de las ventas</h3>
+<div class="dato-grande">
+<span>💰 Total vendido</span>
+<strong id="totalVentas">$0.00</strong>
+</div>
+<div class="dato">
+<span>💵 Efectivo</span>
+<strong id="totalVentasEfectivo">$0.00</strong>
+</div>
+<div class="dato">
+<span>📲 Transferencias de ventas</span>
+<strong id="totalVentasTransferencia">$0.00</strong>
+</div>
 
-<p>
-<strong>🛒 Compras:</strong>
-<span id="totalCompras">$0.00</span>
-</p>
+<div class="divider"></div>
 
-<p>
-<strong>💸 Gastos:</strong>
-<span id="totalGastos">$0.00</span>
+<h3>💸 Salidas que afectan la caja</h3>
+<div class="dato">
+<span>🛒 Compras pagadas hoy</span>
+<strong id="totalCompras">$0.00</strong>
+</div>
+<div class="dato">
+<span>🧾 Créditos pagados hoy</span>
+<strong id="totalPagosCredito">$0.00</strong>
+</div>
+<div class="dato">
+<span>🔴 Crédito pendiente</span>
+<strong id="totalCreditoPendiente">$0.00</strong>
+</div>
+<div class="dato">
+<span>💸 Gastos</span>
+<strong id="totalGastos">$0.00</strong>
+</div>
+<div class="dato">
+<span>🔄 Efectivo entregado por cambios</span>
+<strong id="totalCambiosTransferencia">$0.00</strong>
+</div>
+
+<p class="aviso">
+🔄 Los cambios de efectivo NO son ventas y NO se suman a las
+transferencias de ventas.
 </p>
 
 <div class="divider"></div>
 
-<p>
-<strong>📦 Costo de mercancía vendida:</strong>
-<span id="costoVendido">$0.00</span>
-</p>
-
-<p>
-<strong>✅ Ganancia neta:</strong>
-<span id="ganancia">$0.00</span>
-</p>
+<h3>📈 Ganancia</h3>
+<div class="dato">
+<span>📦 Costo de mercancía vendida</span>
+<strong id="costoVendido">$0.00</strong>
+</div>
+<div class="dato">
+<span>🧾 Ventas - costo - gastos</span>
+<strong id="gananciaOperativa">$0.00</strong>
+</div>
+<div class="dato destacado">
+<span>✅ Ganancia neta</span>
+<strong id="ganancia">$0.00</strong>
+</div>
 
 <div class="divider"></div>
 
-<h3>💵 Caja</h3>
+<h3>💵 Dinero esperado en caja</h3>
 
 <button class="verde" onclick="ponerCajaInicial()">
-Registrar dinero inicial de caja
+💵 Registrar / cambiar dinero inicial
 </button>
 
-<p>
-Dinero inicial:
+<div class="dato">
+<span>Dinero inicial</span>
 <strong id="cajaInicial">$0.00</strong>
-</p>
+</div>
 
-<p class="efectivo" id="dineroCaja">
-$0.00
+<p class="efectivo" id="dineroCaja">$0.00</p>
+
+<p class="aviso">
+Fórmula: dinero inicial + ventas en efectivo − compras pagadas − pagos de créditos − gastos − efectivo entregado por cambios.
+<br>
+Las ventas por transferencia NO entran a la caja física.
 </p>
 
 <div class="divider"></div>
@@ -376,12 +564,33 @@ $0.00
 </button>
 
 <p class="aviso">
-⚠️ Este botón guarda el resumen del día y limpia únicamente
-las ventas, compras y gastos del día.
+⚠️ Al cerrar el día se guarda el resumen y se limpian solo
+las operaciones del día.
 <br><br>
-<strong>📦 EL INVENTARIO NO SE BORRA NI SE MODIFICA.</strong>
+<strong>📦 EL INVENTARIO QUEDA EXACTAMENTE COMO ESTÁ.</strong>
 </p>
 
+</div>
+
+</div>
+
+
+<!-- RECETAS -->
+
+<div id="recetas" class="oculto">
+
+<div class="card">
+<h2>🍹 Recetas / Preparaciones</h2>
+<p class="aviso">Guarda recetas y consulta el costo estimado por preparación usando los productos de tu inventario.</p>
+<input id="nombreReceta" type="text" placeholder="Nombre de la receta">
+<textarea id="ingredientesReceta" rows="5" placeholder="Ingredientes y cantidades, por ejemplo: 1 refresco + 50 ml de jarabe"></textarea>
+<input id="costoReceta" type="number" min="0" step="0.01" placeholder="Costo estimado por preparación">
+<button onclick="agregarReceta()">Guardar receta</button>
+</div>
+
+<div class="card">
+<h2>📋 Mis recetas</h2>
+<div id="listaRecetas"></div>
 </div>
 
 </div>
@@ -423,14 +632,24 @@ JSON.parse(localStorage.getItem("cantina_ventas_v3")) || [];
 let compras =
 JSON.parse(localStorage.getItem("cantina_compras_v3")) || [];
 
+// Compras a crédito permanecen pendientes entre días hasta liquidarse.
+let creditos =
+JSON.parse(localStorage.getItem("cantina_creditos_v1")) || [];
+
 let gastos =
 JSON.parse(localStorage.getItem("cantina_gastos_v3")) || [];
+
+let movimientos =
+JSON.parse(localStorage.getItem("cantina_movimientos_v3")) || [];
 
 let historial =
 JSON.parse(localStorage.getItem("cantina_historial_v3")) || [];
 
 let cajaInicial =
 Number(localStorage.getItem("cantina_caja_v3")) || 0;
+
+let recetas =
+JSON.parse(localStorage.getItem("cantina_recetas_v1")) || [];
 
 
 /* =========================================================
@@ -455,8 +674,18 @@ function guardar(){
     );
 
     localStorage.setItem(
+        "cantina_creditos_v1",
+        JSON.stringify(creditos)
+    );
+
+    localStorage.setItem(
         "cantina_gastos_v3",
         JSON.stringify(gastos)
+    );
+
+    localStorage.setItem(
+        "cantina_movimientos_v3",
+        JSON.stringify(movimientos)
     );
 
     localStorage.setItem(
@@ -467,6 +696,11 @@ function guardar(){
     localStorage.setItem(
         "cantina_caja_v3",
         cajaInicial
+    );
+
+    localStorage.setItem(
+        "cantina_recetas_v1",
+        JSON.stringify(recetas)
     );
 }
 
@@ -502,8 +736,10 @@ function mostrar(nombre,boton){
         "compras",
         "ventas",
         "gastos",
+        "movimientos",
         "resumen",
-        "historial"
+        "historial",
+        "recetas"
     ].forEach(id=>{
         document.getElementById(id)
         .classList.add("oculto");
@@ -587,79 +823,208 @@ function agregarProducto(){
    COMPRA
    ========================================================= */
 
+function actualizarCamposCompra(){
+
+    const tipo=document.getElementById("tipoCompra").value;
+    document.getElementById("compraUnidadCampos")
+        .classList.toggle("oculto",tipo!=="unidad");
+    document.getElementById("compraCajaCampos")
+        .classList.toggle("oculto",tipo!=="caja");
+
+    actualizarDetalleCompra();
+}
+
+function actualizarDetalleCompra(){
+
+    const tipo=document.getElementById("tipoCompra").value;
+    const detalle=document.getElementById("detalleCompra");
+
+    if(tipo==="unidad"){
+        const cantidad=Number(document.getElementById("cantidadCompra").value)||0;
+        const costo=Number(document.getElementById("costoCompraUnidad").value);
+        detalle.textContent = cantidad>0 && costo>=0 && isFinite(costo)
+            ? `Total compra: $${(cantidad*costo).toFixed(2)} · ${cantidad} unidad(es)`
+            : "Puedes dejar el costo vacío para usar el costo actual del producto.";
+    }else{
+        const cajas=Number(document.getElementById("cantidadCajas").value)||0;
+        const unidades=Number(document.getElementById("unidadesPorCaja").value)||0;
+        const costoCaja=Number(document.getElementById("costoCaja").value);
+        if(cajas>0 && unidades>0 && costoCaja>=0 && isFinite(costoCaja)){
+            const totalUnidades=cajas*unidades;
+            const costoUnidad=costoCaja/unidades;
+            detalle.textContent=`Recibirás ${totalUnidades} unidades · Costo por unidad: $${costoUnidad.toFixed(2)} · Total: $${(cajas*costoCaja).toFixed(2)}`;
+        }else{
+            detalle.textContent="Ejemplo: 1 caja × 12 unidades × $420 = 12 unidades a $35 de costo c/u.";
+        }
+    }
+}
+
 function registrarCompra(){
 
-    const id =
-    Number(document.getElementById("productoCompra").value);
+    const id=Number(document.getElementById("productoCompra").value);
+    const tipo=document.getElementById("tipoCompra").value;
 
-    const cantidad =
-    Number(document.getElementById("cantidadCompra").value);
-
-
-    if(
-        !id ||
-        !cantidad ||
-        cantidad<=0
-    ){
-
-        alert("Selecciona un producto y una cantidad.");
+    if(!id){
+        alert("Selecciona un producto.");
         return;
     }
 
-
-    const producto =
-    productos.find(p=>p.id===id);
-
-
+    const producto=productos.find(p=>p.id===id);
     if(!producto){
-
         alert("Producto no encontrado.");
         return;
     }
 
+    let cantidadUnidades=0;
+    let costoUnitario=Number(producto.costo)||0;
+    let total=0;
+    let detalleCompra="";
 
-    /*
-       AQUÍ ES UNO DE LOS ÚNICOS LUGARES
-       DONDE SE MODIFICA EL INVENTARIO.
-    */
+    if(tipo==="caja"){
+        const cajas=Number(document.getElementById("cantidadCajas").value);
+        const unidadesPorCaja=Number(document.getElementById("unidadesPorCaja").value);
+        const costoCaja=Number(document.getElementById("costoCaja").value);
 
-    producto.stock += cantidad;
+        if(!cajas || cajas<=0 || !unidadesPorCaja || unidadesPorCaja<=0 ||
+           !isFinite(costoCaja) || costoCaja<0){
+            alert("Completa correctamente cajas, unidades por caja y costo de la caja.");
+            return;
+        }
 
+        cantidadUnidades=cajas*unidadesPorCaja;
+        costoUnitario=costoCaja/unidadesPorCaja;
+        total=cajas*costoCaja;
+        detalleCompra=`${cajas} caja(s) × ${unidadesPorCaja} unidades`;
 
-    compras.unshift({
+    }else{
+        const cantidad=Number(document.getElementById("cantidadCompra").value);
+        const costoInput=document.getElementById("costoCompraUnidad").value.trim();
 
-        id:Date.now(),
+        if(!cantidad || cantidad<=0){
+            alert("Ingresa una cantidad de unidades.");
+            return;
+        }
 
-        productoId:producto.id,
+        if(costoInput!==""){
+            costoUnitario=Number(costoInput);
+            if(!isFinite(costoUnitario) || costoUnitario<0){
+                alert("El costo por unidad no es válido.");
+                return;
+            }
+        }
 
-        nombre:producto.nombre,
+        cantidadUnidades=cantidad;
+        total=cantidadUnidades*costoUnitario;
+        detalleCompra=`${cantidadUnidades} unidad(es)`;
+    }
 
-        cantidad:cantidad,
+    const estado = document.getElementById("estadoCompra").value;
+    const proveedor = document.getElementById("proveedorCompra").value.trim() || "Proveedor no indicado";
 
-        costo:producto.costo,
+    /* Las compras a crédito entran al inventario, pero NO salen de caja.
+       Se guardan aparte para poder pagarlas después, incluso tras un cierre. */
+    if(estado === "credito") {
+        creditos.unshift({
+            id: Date.now(),
+            productoId: producto.id,
+            nombre: producto.nombre,
+            proveedor: proveedor,
+            cantidad: cantidadUnidades,
+            tipoCompra: tipo,
+            detalleCompra: detalleCompra,
+            costo: costoUnitario,
+            total: total,
+            saldo: total,
+            fecha: fechaActual(),
+            pagos: []
+        });
+    } else {
+        compras.unshift({
+            id: Date.now(),
+            productoId: producto.id,
+            nombre: producto.nombre,
+            cantidad: cantidadUnidades,
+            tipoCompra: tipo,
+            detalleCompra: detalleCompra,
+            costo: costoUnitario,
+            total: total,
+            fecha: fechaActual(),
+            pagada: true
+        });
+    }
 
-        total:cantidad*producto.costo,
+    producto.stock += cantidadUnidades;
 
-        fecha:fechaActual()
-
-    });
-
+    /* El costo queda expresado SIEMPRE por unidad.
+       Esto permite vender una unidad aunque la compra haya sido por caja. */
+    producto.costo=costoUnitario;
 
     guardar();
     actualizar();
 
-
     document.getElementById("cantidadCompra").value="";
-
+    document.getElementById("costoCompraUnidad").value="";
+    document.getElementById("cantidadCajas").value="";
+    document.getElementById("unidadesPorCaja").value="";
+    document.getElementById("costoCaja").value="";
+    document.getElementById("proveedorCompra").value="";
+    document.getElementById("estadoCompra").value="pagada";
+    actualizarDetalleCompra();
 
     alert(
         "✅ Compra registrada.\n\n"+
         producto.nombre+
-        "\nInventario actual: "+
-        producto.stock
+        "\nEntrada al inventario: "+cantidadUnidades+" unidades"+
+        "\nCosto por unidad: $"+costoUnitario.toFixed(2)+
+        "\nInventario actual: "+producto.stock
     );
 }
 
+/* =========================================================
+   CRÉDITOS / CUENTAS POR PAGAR
+   ========================================================= */
+
+function totalPagosCreditoHoy(){
+    return creditos.reduce((s,c)=>s + (c.pagos || []).filter(p=>p.fecha===fechaActual()).reduce((a,p)=>a+Number(p.monto||0),0),0);
+}
+
+function pagarCredito(id){
+    const credito = creditos.find(c=>c.id===id);
+    if(!credito || credito.saldo <= 0) return;
+
+    const montoInput = prompt(
+        "Pago a " + credito.proveedor + "\n" + credito.nombre + "\n\nSaldo pendiente: $" + Number(credito.saldo).toFixed(2) + "\n\nEscribe cuánto vas a pagar:",
+        Number(credito.saldo).toFixed(2)
+    );
+    if(montoInput===null) return;
+
+    const monto=Number(montoInput);
+    if(!isFinite(monto) || monto<=0 || monto>credito.saldo){
+        alert("El monto no es válido. No puede ser mayor al saldo pendiente.");
+        return;
+    }
+
+    credito.saldo = Math.max(0, Number(credito.saldo)-monto);
+    credito.pagos = credito.pagos || [];
+    credito.pagos.unshift({id:Date.now(), monto:monto, fecha:fechaActual(), hora:new Date().toLocaleTimeString("es-MX")});
+
+    guardar();
+    actualizar();
+
+    alert("✅ Pago registrado.\n\nSe descontaron $"+monto.toFixed(2)+" de caja."+(credito.saldo===0 ? "\nLa deuda quedó liquidada." : "\nSaldo restante: $"+credito.saldo.toFixed(2)));
+}
+
+function eliminarCredito(id){
+    const credito=creditos.find(c=>c.id===id);
+    if(!credito) return;
+    if((credito.pagos||[]).length>0){
+        alert("No puedes eliminar una deuda que ya tiene pagos registrados.");
+        return;
+    }
+    if(!confirm("¿Eliminar esta compra a crédito? El inventario NO se revertirá.")) return;
+    creditos=creditos.filter(c=>c.id!==id);
+    guardar(); actualizar();
+}
 
 /* =========================================================
    VENTA
@@ -739,6 +1104,8 @@ function registrarVenta(){
 
         total:cantidad*producto.precio,
 
+        metodoPago: document.getElementById("metodoVenta").value,
+
         costoTotal:cantidad*producto.costo,
 
         fecha:fechaActual(),
@@ -806,6 +1173,52 @@ function eliminarVenta(id){
     ventas =
     ventas.filter(v=>v.id!==id);
 
+
+    guardar();
+    actualizar();
+}
+
+
+/* =========================================================
+   CAMBIO DE EFECTIVO POR TRANSFERENCIA (NO VENTA)
+   ========================================================= */
+
+function registrarCambioEfectivo(){
+
+    const monto = Number(document.getElementById("montoCambio").value);
+    const nota = document.getElementById("notaCambio").value.trim();
+
+    if(!monto || monto <= 0){
+        alert("Ingresa un monto válido.");
+        return;
+    }
+
+    movimientos.unshift({
+        id: Date.now(),
+        monto: monto,
+        nota: nota || "Cambio de efectivo",
+        fecha: fechaActual(),
+        hora: new Date().toLocaleTimeString("es-MX")
+    });
+
+    guardar();
+    actualizar();
+
+    document.getElementById("montoCambio").value="";
+    document.getElementById("notaCambio").value="";
+
+    alert(
+        "✅ Cambio registrado.\n\n"+
+        "La transferencia quedó separada de las ventas.\n"+
+        "La caja disminuyó $"+monto.toFixed(2)+"."
+    );
+}
+
+function eliminarMovimiento(id){
+
+    if(!confirm("¿Eliminar este cambio de efectivo?")) return;
+
+    movimientos = movimientos.filter(m=>m.id!==id);
 
     guardar();
     actualizar();
@@ -938,11 +1351,13 @@ function nuevoDia(){
     );
 
 
-    const totalCompras =
-    compras.reduce(
-        (s,c)=>s+c.total,
-        0
-    );
+    const totalComprasPagadas =
+    compras.reduce((s,c)=>s+Number(c.total||0),0);
+
+    const pagosCreditoHoy = totalPagosCreditoHoy();
+
+    // Se muestran por separado para que la caja sea fácil de entender.
+    const totalCompras = totalComprasPagadas;
 
 
     const totalGastos =
@@ -965,11 +1380,21 @@ function nuevoDia(){
     totalGastos;
 
 
+    const ventasEfectivo =
+    ventas
+    .filter(v => (v.metodoPago || "efectivo") === "efectivo")
+    .reduce((s,v)=>s+v.total,0);
+
+    const totalCambios =
+    movimientos.reduce((s,m)=>s+m.monto,0);
+
     const cajaFinal =
     cajaInicial +
-    totalVentas -
+    ventasEfectivo -
     totalCompras -
-    totalGastos;
+    pagosCreditoHoy -
+    totalGastos -
+    totalCambios;
 
 
     if(!confirm(
@@ -1031,6 +1456,28 @@ function nuevoDia(){
 
         cajaInicial:cajaInicial,
 
+        ventasEfectivo:ventasEfectivo,
+
+        ventasTransferencia:ventas
+        .filter(v => (v.metodoPago || "efectivo") === "transferencia")
+        .reduce((s,v)=>s+v.total,0),
+
+        cambiosTransferencia:totalCambios,
+
+        pagosCredito:pagosCreditoHoy,
+        creditoPendiente:creditos.reduce((s,c)=>s+Number(c.saldo||0),0),
+        creditosPendientes: creditos.filter(c=>Number(c.saldo||0)>0).map(c=>({proveedor:c.proveedor,nombre:c.nombre,saldo:Number(c.saldo||0)})),
+
+        productosVendidos: ventas.reduce((acc,v)=>{
+            const key=v.productoId || v.nombre;
+            if(!acc[key]) acc[key]={nombre:v.nombre,cantidad:0,total:0,costo:0,ganancia:0};
+            acc[key].cantidad += v.cantidad;
+            acc[key].total += v.total;
+            acc[key].costo += Number(v.costoTotal || 0);
+            acc[key].ganancia += Number(v.total || 0) - Number(v.costoTotal || 0);
+            return acc;
+        },{}),
+
         cajaFinal:cajaFinal
 
     });
@@ -1044,6 +1491,7 @@ function nuevoDia(){
     ventas=[];
     compras=[];
     gastos=[];
+    movimientos=[];
 
     cajaInicial=0;
 
@@ -1065,6 +1513,119 @@ function nuevoDia(){
         "📚 Resumen guardado en historial.\n\n"+
         "El nuevo día comienza con exactamente "+
         "el inventario que quedó."
+    );
+}
+
+
+/* =========================================================
+   EDITAR PRODUCTO / PRECIO
+   ========================================================= */
+
+function editarProducto(id){
+
+    const producto = productos.find(p=>p.id===id);
+    if(!producto) return;
+
+    const nuevoPrecio = prompt(
+        "Precio de venta de " + producto.nombre + ":",
+        producto.precio
+    );
+
+    if(nuevoPrecio===null) return;
+
+    const precio = Number(nuevoPrecio);
+
+    if(!isFinite(precio) || precio < 0){
+        alert("Precio inválido.");
+        return;
+    }
+
+    producto.precio = precio;
+
+    guardar();
+    actualizar();
+
+    alert(
+        "✅ Precio actualizado.\n\n"+
+        producto.nombre+
+        ": $"+precio.toFixed(2)
+    );
+}
+
+function editarCosto(id){
+
+    const producto = productos.find(p=>p.id===id);
+    if(!producto) return;
+
+    const nuevoCosto = prompt(
+        "Costo de compra de " + producto.nombre + ":",
+        producto.costo
+    );
+
+    if(nuevoCosto===null) return;
+
+    const costo = Number(nuevoCosto);
+
+    if(!isFinite(costo) || costo < 0){
+        alert("Costo inválido.");
+        return;
+    }
+
+    producto.costo = costo;
+
+    guardar();
+    actualizar();
+
+    alert(
+        "✅ Costo actualizado.\n\n"+
+        producto.nombre+
+        ": $"+costo.toFixed(2)
+    );
+}
+
+
+/* =========================================================
+   AJUSTAR EXISTENCIA MANUALMENTE
+   ========================================================= */
+
+function ajustarInventario(id){
+
+    const producto = productos.find(p=>p.id===id);
+    if(!producto) return;
+
+    const nuevoStock = prompt(
+        "Existencia REAL de " + producto.nombre + ":\n\n" +
+        "Inventario actual: " + producto.stock + "\n\n" +
+        "Escribe la cantidad que tienes físicamente:",
+        producto.stock
+    );
+
+    if(nuevoStock===null) return;
+
+    if(nuevoStock.trim()==="" || !/^\d+$/.test(nuevoStock.trim())){
+        alert("Ingresa una cantidad entera válida (0 o mayor).");
+        return;
+    }
+
+    const stock = Number(nuevoStock);
+
+    if(!Number.isSafeInteger(stock) || stock<0){
+        alert("La existencia no es válida.");
+        return;
+    }
+
+    const anterior = producto.stock;
+    producto.stock = stock;
+
+    guardar();
+    actualizar();
+
+    alert(
+        "✅ Inventario actualizado.\n\n" +
+        producto.nombre +
+        "\nAntes: " + anterior +
+        "\nAhora: " + stock +
+        "\n\nEste ajuste no cuenta como venta ni compra y no cambia la ganancia."
     );
 }
 
@@ -1131,6 +1692,20 @@ function actualizar(){
                     $${(p.precio-p.costo).toFixed(2)}
                     </span>
 
+                    <br><br>
+
+                    <button class="small" onclick="editarProducto(${p.id})">
+                    ✏️ Cambiar precio
+                    </button>
+
+                    <button class="small gris" onclick="editarCosto(${p.id})">
+                    ✏️ Cambiar costo
+                    </button>
+
+                    <button class="small verde" onclick="ajustarInventario(${p.id})">
+                    📦 Ajustar existencia
+                    </button>
+
                 </div>
 
             </div>
@@ -1141,6 +1716,9 @@ function actualizar(){
 
     }
 
+
+    const valorInventario = productos.reduce((s,p)=>s + Number(p.stock||0)*Number(p.costo||0),0);
+    html += `<div class="card" style="margin-top:12px;background:#f7f7f7"><strong>💰 Valor total del inventario:</strong> $${valorInventario.toFixed(2)}</div>`;
 
     document.getElementById(
         "inventario"
@@ -1225,6 +1803,12 @@ function actualizar(){
 
                     <br>
 
+                    ${((v.metodoPago || "efectivo") === "transferencia")
+                      ? "📲 Transferencia"
+                      : "💵 Efectivo"}
+
+                    <br>
+
                     <span class="aviso">
                     ${v.fecha} ${v.hora}
                     </span>
@@ -1277,11 +1861,19 @@ function actualizar(){
                     ${escapeHTML(c.nombre)}
                     </strong>
 
-                    × ${c.cantidad}
+                    × ${c.cantidad} unidades
 
                     <br>
 
-                    💰 $${c.total.toFixed(2)}
+                    ${c.tipoCompra === "caja" ? "🗃️ "+escapeHTML(c.detalleCompra || "Compra por caja") : "📦 Compra por unidad"}
+
+                    <br>
+
+                    💵 Costo unitario: $${Number(c.costo || 0).toFixed(2)}
+
+                    <br>
+
+                    💰 Total: $${Number(c.total || 0).toFixed(2)}
 
                 </div>
 
@@ -1297,6 +1889,86 @@ function actualizar(){
     document.getElementById(
         "listaCompras"
     ).innerHTML=listaCompras;
+
+    /* CRÉDITOS PENDIENTES */
+    let listaCreditos="";
+    const pendientes=creditos.filter(c=>Number(c.saldo||0)>0);
+    if(pendientes.length===0){
+        listaCreditos="<p style='color:#888;text-align:center'>Sin créditos pendientes 🎉</p>";
+    }else{
+        pendientes.forEach(c=>{
+            listaCreditos += `
+            <div class="item">
+                <div>
+                    <strong>🧾 ${escapeHTML(c.nombre)}</strong>
+                    <br>🏪 ${escapeHTML(c.proveedor)}
+                    <br>📅 Compra: ${escapeHTML(c.fecha)}
+                    <br>📦 ${c.cantidad} unidades${c.tipoCompra === "caja" ? " · "+escapeHTML(c.detalleCompra||"") : ""}
+                    <br>💰 Total: $${Number(c.total||0).toFixed(2)}
+                    <br><strong>🔴 Saldo pendiente: $${Number(c.saldo||0).toFixed(2)}</strong>
+                </div>
+                <button class="small verde" onclick="pagarCredito(${c.id})">💵 Registrar pago</button>
+            </div>`;
+        });
+    }
+    document.getElementById("listaCreditos").innerHTML=listaCreditos;
+
+    /* MOVIMIENTOS DE CAJA */
+
+    let listaMovimientos="";
+
+    if(movimientos.length===0){
+
+        listaMovimientos =
+        "<p style='color:#888;text-align:center'>"+
+        "Sin cambios de efectivo hoy"+
+        "</p>";
+
+    }else{
+
+        movimientos.forEach(m=>{
+
+            listaMovimientos += `
+
+            <div class="item">
+
+                <div>
+
+                    <strong>🔄 ${escapeHTML(m.nota)}</strong>
+
+                    <br>
+
+                    📲 Transferencia recibida:
+                    $${m.monto.toFixed(2)}
+
+                    <br>
+
+                    💵 Efectivo entregado:
+                    $${m.monto.toFixed(2)}
+
+                    <br>
+
+                    <span class="aviso">
+                    ${m.fecha} ${m.hora}
+                    </span>
+
+                </div>
+
+                <button class="small danger"
+                onclick="eliminarMovimiento(${m.id})">
+                🗑️
+                </button>
+
+            </div>
+
+            `;
+
+        });
+
+    }
+
+    document.getElementById("listaMovimientos").innerHTML =
+    listaMovimientos;
 
 
     /* GASTOS */
@@ -1350,6 +2022,16 @@ function actualizar(){
         "listaGastos"
     ).innerHTML=listaGastos;
 
+    let listaRecetas="";
+    if(recetas.length===0){
+        listaRecetas="<p style='color:#888;text-align:center'>Sin recetas guardadas</p>";
+    }else{
+        recetas.forEach(r=>{
+            listaRecetas+=`<div class="historial"><strong>🍹 ${escapeHTML(r.nombre)}</strong><p style="white-space:pre-wrap;margin-top:7px">${escapeHTML(r.ingredientes)}</p><p>💰 Costo estimado: $${Number(r.costo||0).toFixed(2)}</p><button class="small danger" onclick="eliminarReceta(${r.id})">🗑️ Eliminar</button></div>`;
+        });
+    }
+    document.getElementById("listaRecetas").innerHTML=listaRecetas;
+
 
     /* RESUMEN POR PRODUCTO */
 
@@ -1392,11 +2074,19 @@ function actualizar(){
 
             resumenHTML+=`
 
-            <p>
-            • <strong>${escapeHTML(nombre)}</strong>:
-            ${d.cantidad} unidades =
-            $${d.total.toFixed(2)}
-            </p>
+            <div class="producto-resumen">
+
+                <div class="producto-resumen-top">
+                    <span>🍺 ${escapeHTML(nombre)}</span>
+                    <span>$${d.total.toFixed(2)}</span>
+                </div>
+
+                <div class="producto-resumen-detail">
+                    ${d.cantidad} unidad${d.cantidad===1 ? "" : "es"}
+                    × $${(d.total/d.cantidad).toFixed(2)}
+                </div>
+
+            </div>
 
             `;
 
@@ -1419,11 +2109,13 @@ function actualizar(){
     );
 
 
-    const totalCompras =
-    compras.reduce(
-        (s,c)=>s+c.total,
-        0
-    );
+    const totalComprasPagadas =
+    compras.reduce((s,c)=>s+Number(c.total||0),0);
+
+    const pagosCreditoHoy = totalPagosCreditoHoy();
+
+    // Se muestran por separado para que la caja sea fácil de entender.
+    const totalCompras = totalComprasPagadas;
 
 
     const totalGastos =
@@ -1446,11 +2138,26 @@ function actualizar(){
     totalGastos;
 
 
+    const ventasEfectivo =
+    ventas
+    .filter(v => (v.metodoPago || "efectivo") === "efectivo")
+    .reduce((s,v)=>s+v.total,0);
+
+    const ventasTransferencia =
+    ventas
+    .filter(v => (v.metodoPago || "efectivo") === "transferencia")
+    .reduce((s,v)=>s+v.total,0);
+
+    const totalCambios =
+    movimientos.reduce((s,m)=>s+m.monto,0);
+
     const caja =
     cajaInicial +
-    totalVentas -
+    ventasEfectivo -
     totalCompras -
-    totalGastos;
+    pagosCreditoHoy -
+    totalGastos -
+    totalCambios;
 
 
     document.getElementById(
@@ -1460,9 +2167,30 @@ function actualizar(){
 
 
     document.getElementById(
+        "totalVentasEfectivo"
+    ).textContent=
+    "$"+ventasEfectivo.toFixed(2);
+
+    document.getElementById(
+        "totalVentasTransferencia"
+    ).textContent=
+    "$"+ventasTransferencia.toFixed(2);
+
+    document.getElementById(
+        "totalCambiosTransferencia"
+    ).textContent=
+    "$"+totalCambios.toFixed(2);
+
+    document.getElementById(
         "totalCompras"
     ).textContent=
     "$"+totalCompras.toFixed(2);
+
+    document.getElementById("totalPagosCredito").textContent=
+    "$"+pagosCreditoHoy.toFixed(2);
+
+    document.getElementById("totalCreditoPendiente").textContent=
+    "$"+creditos.reduce((s,c)=>s+Number(c.saldo||0),0).toFixed(2);
 
 
     document.getElementById(
@@ -1476,6 +2204,9 @@ function actualizar(){
     ).textContent=
     "$"+costo.toFixed(2);
 
+
+    document.getElementById("gananciaOperativa").textContent=
+    "$"+ganancia.toFixed(2);
 
     document.getElementById(
         "ganancia"
@@ -1513,6 +2244,31 @@ function actualizar(){
    HISTORIAL
    ========================================================= */
 
+function agregarReceta(){
+    const nombre=document.getElementById("nombreReceta").value.trim();
+    const ingredientes=document.getElementById("ingredientesReceta").value.trim();
+    const costo=Number(document.getElementById("costoReceta").value)||0;
+    if(!nombre || !ingredientes){ alert("Escribe el nombre y los ingredientes."); return; }
+    recetas.unshift({id:Date.now(),nombre,ingredientes,costo});
+    guardar(); actualizar();
+    document.getElementById("nombreReceta").value="";
+    document.getElementById("ingredientesReceta").value="";
+    document.getElementById("costoReceta").value="";
+}
+
+function eliminarReceta(id){
+    if(!confirm("¿Eliminar esta receta?")) return;
+    recetas=recetas.filter(r=>r.id!==id); guardar(); actualizar();
+}
+
+function renderProductosHistorial(productosVendidos){
+    if(!productosVendidos || Object.keys(productosVendidos).length===0) return '<p class="aviso">Sin ventas de productos.</p>';
+    return Object.values(productosVendidos).map(x=>`<div class="producto-resumen"><div class="producto-resumen-top"><span>${escapeHTML(x.nombre)}</span><span>${x.cantidad} und.</span></div><div class="producto-resumen-detail">
+Ventas: $${x.total.toFixed(2)} · Costo: $${Number(x.costo || 0).toFixed(2)}
+<br>Ganancia: $${Number(x.ganancia || 0).toFixed(2)}
+</div></div>`).join('');
+}
+
 function actualizarHistorial(){
 
     let html="";
@@ -1540,8 +2296,29 @@ function actualizarHistorial(){
                 <p>💰 Ventas:
                 $${d.ventas.toFixed(2)}</p>
 
-                <p>🛒 Compras:
+                <p>💵 Efectivo de ventas:
+                $${(d.ventasEfectivo || 0).toFixed(2)}</p>
+
+                <p>📲 Transferencias de ventas:
+                $${(d.ventasTransferencia || 0).toFixed(2)}</p>
+
+                <div class="resumen-bloque">
+                    <strong>🍺 Productos vendidos</strong>
+                    ${renderProductosHistorial(d.productosVendidos)}
+                </div>
+
+                <p>🔄 Cambios de efectivo:
+                $${(d.cambiosTransferencia || 0).toFixed(2)}</p>
+
+                <p>🛒 Compras pagadas:
                 $${d.compras.toFixed(2)}</p>
+
+                <p>🧾 Créditos pagados ese día:
+                $${Number(d.pagosCredito || 0).toFixed(2)}</p>
+
+                <p>🔴 Crédito pendiente al cierre:
+                $${Number(d.creditoPendiente || 0).toFixed(2)}</p>
+                ${d.creditosPendientes && d.creditosPendientes.length ? `<div class="resumen-bloque"><strong>🧾 Deudas pendientes</strong>${d.creditosPendientes.map(c=>`<p style="margin:6px 0">${escapeHTML(c.nombre)} · ${escapeHTML(c.proveedor)} · <strong>$${Number(c.saldo||0).toFixed(2)}</strong></p>`).join('')}</div>` : ''}
 
                 <p>💸 Gastos:
                 $${d.gastos.toFixed(2)}</p>
@@ -1596,6 +2373,13 @@ function escapeHTML(text){
    INICIAR
    ========================================================= */
 
+document.getElementById("cantidadCompra").addEventListener("input",actualizarDetalleCompra);
+document.getElementById("costoCompraUnidad").addEventListener("input",actualizarDetalleCompra);
+document.getElementById("cantidadCajas").addEventListener("input",actualizarDetalleCompra);
+document.getElementById("unidadesPorCaja").addEventListener("input",actualizarDetalleCompra);
+document.getElementById("costoCaja").addEventListener("input",actualizarDetalleCompra);
+
+actualizarDetalleCompra();
 actualizar();
 
 </script>

@@ -286,6 +286,13 @@ NO modifica las existencias.
 <option value="caja">🗃️ Compra por caja</option>
 </select>
 
+<input id="proveedorCompra" type="text" placeholder="Proveedor (opcional)">
+
+<select id="estadoCompra">
+<option value="pagada">💵 Compra pagada</option>
+<option value="credito">🧾 Compra a crédito</option>
+</select>
+
 <div id="compraUnidadCampos">
 <input id="cantidadCompra"
 type="number"
@@ -330,9 +337,17 @@ Registrar Compra
 
 <div class="card">
 
-<h2>📋 Compras del día</h2>
+<h2>📋 Compras pagadas del día</h2>
 
 <div id="listaCompras"></div>
+
+</div>
+
+<div class="card">
+
+<h2>🧾 Créditos pendientes</h2>
+<p class="aviso">Las compras a crédito entran al inventario inmediatamente. No descuentan caja hasta que registres el pago.</p>
+<div id="listaCreditos"></div>
 
 </div>
 
@@ -480,8 +495,16 @@ Registrar Gasto
 
 <h3>💸 Salidas que afectan la caja</h3>
 <div class="dato">
-<span>🛒 Compras</span>
+<span>🛒 Compras pagadas hoy</span>
 <strong id="totalCompras">$0.00</strong>
+</div>
+<div class="dato">
+<span>🧾 Créditos pagados hoy</span>
+<strong id="totalPagosCredito">$0.00</strong>
+</div>
+<div class="dato">
+<span>🔴 Crédito pendiente</span>
+<strong id="totalCreditoPendiente">$0.00</strong>
 </div>
 <div class="dato">
 <span>💸 Gastos</span>
@@ -529,7 +552,7 @@ transferencias de ventas.
 <p class="efectivo" id="dineroCaja">$0.00</p>
 
 <p class="aviso">
-Fórmula: dinero inicial + ventas en efectivo − compras − gastos − efectivo entregado por cambios.
+Fórmula: dinero inicial + ventas en efectivo − compras pagadas − pagos de créditos − gastos − efectivo entregado por cambios.
 <br>
 Las ventas por transferencia NO entran a la caja física.
 </p>
@@ -609,6 +632,10 @@ JSON.parse(localStorage.getItem("cantina_ventas_v3")) || [];
 let compras =
 JSON.parse(localStorage.getItem("cantina_compras_v3")) || [];
 
+// Compras a crédito permanecen pendientes entre días hasta liquidarse.
+let creditos =
+JSON.parse(localStorage.getItem("cantina_creditos_v1")) || [];
+
 let gastos =
 JSON.parse(localStorage.getItem("cantina_gastos_v3")) || [];
 
@@ -644,6 +671,11 @@ function guardar(){
     localStorage.setItem(
         "cantina_compras_v3",
         JSON.stringify(compras)
+    );
+
+    localStorage.setItem(
+        "cantina_creditos_v1",
+        JSON.stringify(creditos)
     );
 
     localStorage.setItem(
@@ -886,23 +918,46 @@ function registrarCompra(){
         detalleCompra=`${cantidadUnidades} unidad(es)`;
     }
 
+    const estado = document.getElementById("estadoCompra").value;
+    const proveedor = document.getElementById("proveedorCompra").value.trim() || "Proveedor no indicado";
+
+    /* Las compras a crédito entran al inventario, pero NO salen de caja.
+       Se guardan aparte para poder pagarlas después, incluso tras un cierre. */
+    if(estado === "credito") {
+        creditos.unshift({
+            id: Date.now(),
+            productoId: producto.id,
+            nombre: producto.nombre,
+            proveedor: proveedor,
+            cantidad: cantidadUnidades,
+            tipoCompra: tipo,
+            detalleCompra: detalleCompra,
+            costo: costoUnitario,
+            total: total,
+            saldo: total,
+            fecha: fechaActual(),
+            pagos: []
+        });
+    } else {
+        compras.unshift({
+            id: Date.now(),
+            productoId: producto.id,
+            nombre: producto.nombre,
+            cantidad: cantidadUnidades,
+            tipoCompra: tipo,
+            detalleCompra: detalleCompra,
+            costo: costoUnitario,
+            total: total,
+            fecha: fechaActual(),
+            pagada: true
+        });
+    }
+
     producto.stock += cantidadUnidades;
 
     /* El costo queda expresado SIEMPRE por unidad.
        Esto permite vender una unidad aunque la compra haya sido por caja. */
     producto.costo=costoUnitario;
-
-    compras.unshift({
-        id:Date.now(),
-        productoId:producto.id,
-        nombre:producto.nombre,
-        cantidad:cantidadUnidades,
-        tipoCompra:tipo,
-        detalleCompra:detalleCompra,
-        costo:costoUnitario,
-        total:total,
-        fecha:fechaActual()
-    });
 
     guardar();
     actualizar();
@@ -912,6 +967,8 @@ function registrarCompra(){
     document.getElementById("cantidadCajas").value="";
     document.getElementById("unidadesPorCaja").value="";
     document.getElementById("costoCaja").value="";
+    document.getElementById("proveedorCompra").value="";
+    document.getElementById("estadoCompra").value="pagada";
     actualizarDetalleCompra();
 
     alert(
@@ -921,6 +978,52 @@ function registrarCompra(){
         "\nCosto por unidad: $"+costoUnitario.toFixed(2)+
         "\nInventario actual: "+producto.stock
     );
+}
+
+/* =========================================================
+   CRÉDITOS / CUENTAS POR PAGAR
+   ========================================================= */
+
+function totalPagosCreditoHoy(){
+    return creditos.reduce((s,c)=>s + (c.pagos || []).filter(p=>p.fecha===fechaActual()).reduce((a,p)=>a+Number(p.monto||0),0),0);
+}
+
+function pagarCredito(id){
+    const credito = creditos.find(c=>c.id===id);
+    if(!credito || credito.saldo <= 0) return;
+
+    const montoInput = prompt(
+        "Pago a " + credito.proveedor + "\n" + credito.nombre + "\n\nSaldo pendiente: $" + Number(credito.saldo).toFixed(2) + "\n\nEscribe cuánto vas a pagar:",
+        Number(credito.saldo).toFixed(2)
+    );
+    if(montoInput===null) return;
+
+    const monto=Number(montoInput);
+    if(!isFinite(monto) || monto<=0 || monto>credito.saldo){
+        alert("El monto no es válido. No puede ser mayor al saldo pendiente.");
+        return;
+    }
+
+    credito.saldo = Math.max(0, Number(credito.saldo)-monto);
+    credito.pagos = credito.pagos || [];
+    credito.pagos.unshift({id:Date.now(), monto:monto, fecha:fechaActual(), hora:new Date().toLocaleTimeString("es-MX")});
+
+    guardar();
+    actualizar();
+
+    alert("✅ Pago registrado.\n\nSe descontaron $"+monto.toFixed(2)+" de caja."+(credito.saldo===0 ? "\nLa deuda quedó liquidada." : "\nSaldo restante: $"+credito.saldo.toFixed(2)));
+}
+
+function eliminarCredito(id){
+    const credito=creditos.find(c=>c.id===id);
+    if(!credito) return;
+    if((credito.pagos||[]).length>0){
+        alert("No puedes eliminar una deuda que ya tiene pagos registrados.");
+        return;
+    }
+    if(!confirm("¿Eliminar esta compra a crédito? El inventario NO se revertirá.")) return;
+    creditos=creditos.filter(c=>c.id!==id);
+    guardar(); actualizar();
 }
 
 /* =========================================================
@@ -1248,11 +1351,13 @@ function nuevoDia(){
     );
 
 
-    const totalCompras =
-    compras.reduce(
-        (s,c)=>s+c.total,
-        0
-    );
+    const totalComprasPagadas =
+    compras.reduce((s,c)=>s+Number(c.total||0),0);
+
+    const pagosCreditoHoy = totalPagosCreditoHoy();
+
+    // Se muestran por separado para que la caja sea fácil de entender.
+    const totalCompras = totalComprasPagadas;
 
 
     const totalGastos =
@@ -1287,6 +1392,7 @@ function nuevoDia(){
     cajaInicial +
     ventasEfectivo -
     totalCompras -
+    pagosCreditoHoy -
     totalGastos -
     totalCambios;
 
@@ -1357,6 +1463,10 @@ function nuevoDia(){
         .reduce((s,v)=>s+v.total,0),
 
         cambiosTransferencia:totalCambios,
+
+        pagosCredito:pagosCreditoHoy,
+        creditoPendiente:creditos.reduce((s,c)=>s+Number(c.saldo||0),0),
+        creditosPendientes: creditos.filter(c=>Number(c.saldo||0)>0).map(c=>({proveedor:c.proveedor,nombre:c.nombre,saldo:Number(c.saldo||0)})),
 
         productosVendidos: ventas.reduce((acc,v)=>{
             const key=v.productoId || v.nombre;
@@ -1607,6 +1717,9 @@ function actualizar(){
     }
 
 
+    const valorInventario = productos.reduce((s,p)=>s + Number(p.stock||0)*Number(p.costo||0),0);
+    html += `<div class="card" style="margin-top:12px;background:#f7f7f7"><strong>💰 Valor total del inventario:</strong> $${valorInventario.toFixed(2)}</div>`;
+
     document.getElementById(
         "inventario"
     ).innerHTML=html;
@@ -1777,6 +1890,28 @@ function actualizar(){
         "listaCompras"
     ).innerHTML=listaCompras;
 
+    /* CRÉDITOS PENDIENTES */
+    let listaCreditos="";
+    const pendientes=creditos.filter(c=>Number(c.saldo||0)>0);
+    if(pendientes.length===0){
+        listaCreditos="<p style='color:#888;text-align:center'>Sin créditos pendientes 🎉</p>";
+    }else{
+        pendientes.forEach(c=>{
+            listaCreditos += `
+            <div class="item">
+                <div>
+                    <strong>🧾 ${escapeHTML(c.nombre)}</strong>
+                    <br>🏪 ${escapeHTML(c.proveedor)}
+                    <br>📅 Compra: ${escapeHTML(c.fecha)}
+                    <br>📦 ${c.cantidad} unidades${c.tipoCompra === "caja" ? " · "+escapeHTML(c.detalleCompra||"") : ""}
+                    <br>💰 Total: $${Number(c.total||0).toFixed(2)}
+                    <br><strong>🔴 Saldo pendiente: $${Number(c.saldo||0).toFixed(2)}</strong>
+                </div>
+                <button class="small verde" onclick="pagarCredito(${c.id})">💵 Registrar pago</button>
+            </div>`;
+        });
+    }
+    document.getElementById("listaCreditos").innerHTML=listaCreditos;
 
     /* MOVIMIENTOS DE CAJA */
 
@@ -1974,11 +2109,13 @@ function actualizar(){
     );
 
 
-    const totalCompras =
-    compras.reduce(
-        (s,c)=>s+c.total,
-        0
-    );
+    const totalComprasPagadas =
+    compras.reduce((s,c)=>s+Number(c.total||0),0);
+
+    const pagosCreditoHoy = totalPagosCreditoHoy();
+
+    // Se muestran por separado para que la caja sea fácil de entender.
+    const totalCompras = totalComprasPagadas;
 
 
     const totalGastos =
@@ -2018,6 +2155,7 @@ function actualizar(){
     cajaInicial +
     ventasEfectivo -
     totalCompras -
+    pagosCreditoHoy -
     totalGastos -
     totalCambios;
 
@@ -2047,6 +2185,12 @@ function actualizar(){
         "totalCompras"
     ).textContent=
     "$"+totalCompras.toFixed(2);
+
+    document.getElementById("totalPagosCredito").textContent=
+    "$"+pagosCreditoHoy.toFixed(2);
+
+    document.getElementById("totalCreditoPendiente").textContent=
+    "$"+creditos.reduce((s,c)=>s+Number(c.saldo||0),0).toFixed(2);
 
 
     document.getElementById(
@@ -2166,8 +2310,15 @@ function actualizarHistorial(){
                 <p>🔄 Cambios de efectivo:
                 $${(d.cambiosTransferencia || 0).toFixed(2)}</p>
 
-                <p>🛒 Compras:
+                <p>🛒 Compras pagadas:
                 $${d.compras.toFixed(2)}</p>
+
+                <p>🧾 Créditos pagados ese día:
+                $${Number(d.pagosCredito || 0).toFixed(2)}</p>
+
+                <p>🔴 Crédito pendiente al cierre:
+                $${Number(d.creditoPendiente || 0).toFixed(2)}</p>
+                ${d.creditosPendientes && d.creditosPendientes.length ? `<div class="resumen-bloque"><strong>🧾 Deudas pendientes</strong>${d.creditosPendientes.map(c=>`<p style="margin:6px 0">${escapeHTML(c.nombre)} · ${escapeHTML(c.proveedor)} · <strong>$${Number(c.saldo||0).toFixed(2)}</strong></p>`).join('')}</div>` : ''}
 
                 <p>💸 Gastos:
                 $${d.gastos.toFixed(2)}</p>
